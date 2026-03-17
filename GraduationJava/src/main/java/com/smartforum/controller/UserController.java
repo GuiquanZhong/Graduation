@@ -78,7 +78,11 @@ public class UserController {
      */
     @GetMapping("/info")
     public Result<?> getUserInfo(@RequestAttribute("userId") Long userId) {
-        return Result.success(userService.getUserById(userId));
+        User user = userService.getUserById(userId);
+        if (user != null) {
+            user.setPassword(null); // 不返回密码
+        }
+        return Result.success(user);
     }
 
     /**
@@ -208,5 +212,39 @@ public class UserController {
             @PathVariable Long targetUserId) {
         userFollowService.removeFollow(userId, targetUserId);
         return Result.success("已取消关注");
+    }
+
+    /**
+     * 修改昵称（需登录）
+     */
+    @PutMapping("/nickname")
+    public Result<?> updateNickname(@RequestAttribute("userId") Long userId,
+            @RequestBody Map<String, String> params) {
+        String nickname = params.get("nickname");
+        if (nickname == null || nickname.trim().isEmpty()) {
+            return Result.error("昵称不能为空");
+        }
+        userService.updateNickname(userId, nickname);
+        return Result.success("昵称修改成功");
+    }
+
+    /**
+     * 修改密码（需登录，需验证旧密码）
+     */
+    @PutMapping("/password")
+    public Result<?> changePassword(@RequestAttribute("userId") Long userId,
+            @RequestBody Map<String, String> params) {
+        String oldPassword = params.get("oldPassword");
+        String newPassword = params.get("newPassword");
+
+        if (oldPassword == null || newPassword == null) {
+            return Result.error("原密码和新密码不能为空");
+        }
+        if (newPassword.length() < 6) {
+            return Result.error("新密码长度不能少于6位");
+        }
+
+        userService.changePassword(userId, oldPassword, newPassword);
+        return Result.success("密码修改成功");
     }
 }

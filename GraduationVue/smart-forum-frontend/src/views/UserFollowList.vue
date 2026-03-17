@@ -168,7 +168,7 @@ const getAvatarColor = (name) => {
 
 <style scoped>
 .list-page {
-    max-width: 820px;
+    max-width: 860px;
     margin: 0 auto;
 }
 
@@ -176,24 +176,22 @@ const getAvatarColor = (name) => {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
-    padding: 24px 28px;
+    padding: 20px 24px;
     margin-bottom: 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     position: relative;
     overflow: hidden;
+    box-shadow: var(--shadow-sm);
 }
 
 .page-header::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.04));
-    pointer-events: none;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
 }
 
 .header-left {
@@ -205,15 +203,15 @@ const getAvatarColor = (name) => {
 }
 
 .back-btn {
-    border: none;
-    background: var(--bg-secondary, #f0f0f0);
-    transition: all 0.3s ease;
+    border: 1px solid var(--border) !important;
+    background: white !important;
+    transition: var(--transition) !important;
 }
 
 .back-btn:hover {
-    background: var(--primary);
-    color: white;
-    transform: scale(1.1);
+    background: var(--primary-bg) !important;
+    color: var(--primary) !important;
+    border-color: var(--primary-light) !important;
 }
 
 .page-title {
@@ -240,7 +238,7 @@ const getAvatarColor = (name) => {
 .user-card {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg, 12px);
+    border-radius: var(--radius-md);
     margin-bottom: 10px;
     transition: var(--transition);
     animation: fadeInUp 0.4s ease both;
@@ -251,7 +249,7 @@ const getAvatarColor = (name) => {
 .user-card:hover {
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
-    border-color: var(--primary-light);
+    border-color: rgba(99, 102, 241, 0.2);
 }
 
 .user-card-body {

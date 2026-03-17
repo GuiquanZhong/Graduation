@@ -66,4 +66,35 @@ public class PostController {
         IPage<Post> result = postService.searchPosts(keyword, page, size);
         return Result.success(result);
     }
+
+    /**
+     * 编辑文章（需登录，仅作者本人）
+     */
+    @PutMapping("/update/{id}")
+    public Result<?> updatePost(@PathVariable Long id,
+            @RequestAttribute("userId") Long userId,
+            @RequestBody Map<String, String> params) {
+        String title = params.get("title");
+        String content = params.get("content");
+
+        if (title == null || title.trim().isEmpty()) {
+            return Result.error("标题不能为空");
+        }
+        if (content == null || content.trim().isEmpty()) {
+            return Result.error("内容不能为空");
+        }
+
+        Post post = postService.updatePost(id, userId, title.trim(), content);
+        return Result.success(post);
+    }
+
+    /**
+     * 删除文章（需登录，仅作者本人，逻辑删除）
+     */
+    @DeleteMapping("/delete/{id}")
+    public Result<?> deletePost(@PathVariable Long id,
+            @RequestAttribute("userId") Long userId) {
+        postService.deletePost(id, userId);
+        return Result.success("删除成功");
+    }
 }

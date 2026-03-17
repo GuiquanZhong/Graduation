@@ -102,6 +102,37 @@ public class PostService {
     }
 
     /**
+     * 编辑文章（仅作者本人）
+     */
+    public Post updatePost(Long postId, Long userId, String title, String content) {
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            throw new RuntimeException("文章不存在");
+        }
+        if (!post.getUserId().equals(userId)) {
+            throw new RuntimeException("无权限修改此文章");
+        }
+        post.setTitle(title);
+        post.setContent(content);
+        postMapper.updateById(post);
+        return post;
+    }
+
+    /**
+     * 删除文章（仅作者本人，逻辑删除）
+     */
+    public void deletePost(Long postId, Long userId) {
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            throw new RuntimeException("文章不存在");
+        }
+        if (!post.getUserId().equals(userId)) {
+            throw new RuntimeException("无权限删除此文章");
+        }
+        postMapper.deleteById(postId);
+    }
+
+    /**
      * 填充作者昵称
      */
     private void fillAuthorName(Post post) {

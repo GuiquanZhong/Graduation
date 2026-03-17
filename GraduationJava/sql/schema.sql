@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `post` (
     `title`      VARCHAR(200)  NOT NULL COMMENT '标题',
     `content`    LONGTEXT      NOT NULL COMMENT '内容',
     `summary`    TEXT          DEFAULT NULL COMMENT 'AI生成摘要',
+    `is_deleted` TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否已删除(0-正常,1-已删除)',
     `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -73,3 +74,6 @@ CREATE TABLE IF NOT EXISTS `user_follow` (
     UNIQUE KEY `uk_follower_followed` (`follower_id`, `followed_id`),
     KEY `idx_followed_id` (`followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注表';
+
+-- 若已存在旧版post表，执行以下迁移语句添加逻辑删除字段（新建数据库无需执行）
+-- ALTER TABLE `post` ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已删除(0-正常,1-已删除)' AFTER `summary`;

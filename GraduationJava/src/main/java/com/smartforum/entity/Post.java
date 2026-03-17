@@ -19,6 +19,10 @@ public class Post {
 
     private String summary;
 
+    /** 逻辑删除标志（0-正常，1-已删除） */
+    @TableLogic
+    private Integer isDeleted;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

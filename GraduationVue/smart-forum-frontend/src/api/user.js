@@ -52,3 +52,10 @@ export function removeFollow(targetUserId) {
     return request.delete(`/user/following/${targetUserId}`)
 }
 
+export function updateNickname(nickname) {
+    return request.put('/user/nickname', { nickname })
+}
+
+export function changePassword(oldPassword, newPassword) {
+    return request.put('/user/password', { oldPassword, newPassword })
+}

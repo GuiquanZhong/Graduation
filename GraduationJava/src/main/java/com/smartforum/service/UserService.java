@@ -69,4 +69,37 @@ public class UserService {
     public User getUserById(Long id) {
         return userMapper.selectById(id);
     }
+
+    /**
+     * 修改昵称
+     */
+    public void updateNickname(Long userId, String nickname) {
+        if (nickname == null || nickname.trim().isEmpty()) {
+            throw new RuntimeException("昵称不能为空");
+        }
+        User user = new User();
+        user.setId(userId);
+        user.setNickname(nickname.trim());
+        userMapper.updateById(user);
+    }
+
+    /**
+     * 修改密码（需验证旧密码）
+     */
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("原密码不正确");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new RuntimeException("新密码长度不能少于6位");
+        }
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setPassword(passwordEncoder.encode(newPassword));
+        userMapper.updateById(updateUser);
+    }
 }
