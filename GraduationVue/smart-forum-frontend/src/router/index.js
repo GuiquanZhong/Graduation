@@ -64,6 +64,12 @@ const routes = [
         name: 'UserFollowList',
         component: () => import('@/views/UserFollowList.vue'),
         meta: { title: '关注列表 - 智能论坛' }
+      },
+      {
+        path: 'admin',
+        name: 'Admin',
+        component: () => import('@/views/Admin.vue'),
+        meta: { title: '管理后台 - 智能论坛', requiresAuth: true, requiresAdmin: true }
       }
     ]
   }
@@ -85,6 +91,15 @@ router.beforeEach((to, from, next) => {
       return
     }
   }
+
+  if (to.meta.requiresAdmin) {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null')
+    if (!userInfo || userInfo.role !== 'admin') {
+      next({ path: '/' })
+      return
+    }
+  }
+
   next()
 })
 

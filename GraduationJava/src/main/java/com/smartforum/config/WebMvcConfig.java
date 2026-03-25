@@ -21,6 +21,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/user/register",
                         "/api/post/list",
                         "/api/post/search",
+                        "/api/post/hot-search",
                         "/api/comment/list/**",
                         "/api/user/*/posts",
                         "/api/user/*/comments",

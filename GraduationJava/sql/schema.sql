@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS `user` (
     `password`   VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
     `nickname`   VARCHAR(50)  DEFAULT NULL COMMENT '昵称',
     `avatar`     VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
+    `role`       VARCHAR(20)  NOT NULL DEFAULT 'user' COMMENT '角色(user-普通用户,admin-管理员)',
+    `status`     VARCHAR(20)  NOT NULL DEFAULT 'active' COMMENT '状态(active-正常,banned-封禁)',
     `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`)
@@ -23,12 +25,17 @@ CREATE TABLE IF NOT EXISTS `post` (
     `content`    LONGTEXT      NOT NULL COMMENT '内容',
     `summary`    TEXT          DEFAULT NULL COMMENT 'AI生成摘要',
     `is_deleted` TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否已删除(0-正常,1-已删除)',
+    `is_top`     TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否置顶(0-否,1-是)',
+    `view_count` INT           NOT NULL DEFAULT 0 COMMENT '浏览量',
+    `daily_view_count` INT     NOT NULL DEFAULT 0 COMMENT '今日浏览量',
     `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
-    KEY `idx_created_at` (`created_at`)
+    KEY `idx_created_at` (`created_at`),
+    KEY `idx_is_top` (`is_top`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章表';
+
 
 -- 评论表
 CREATE TABLE IF NOT EXISTS `comment` (
@@ -75,5 +82,12 @@ CREATE TABLE IF NOT EXISTS `user_follow` (
     KEY `idx_followed_id` (`followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注表';
 
--- 若已存在旧版post表，执行以下迁移语句添加逻辑删除字段（新建数据库无需执行）
+-- =============== 迁移语句（已有数据库执行） ===============
 -- ALTER TABLE `post` ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已删除(0-正常,1-已删除)' AFTER `summary`;
+-- ALTER TABLE `user` ADD COLUMN `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色(user-普通用户,admin-管理员)' AFTER `avatar`;
+-- ALTER TABLE `user` ADD COLUMN `status` VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态(active-正常,banned-封禁)' AFTER `role`;
+-- ALTER TABLE `post` ADD COLUMN `is_top` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否置顶(0-否,1-是)' AFTER `is_deleted`;
+-- ALTER TABLE `post` ADD COLUMN `view_count` INT NOT NULL DEFAULT 0 COMMENT '浏览量' AFTER `is_top`;
+-- ALTER TABLE `post` ADD COLUMN `daily_view_count` INT NOT NULL DEFAULT 0 COMMENT '今日浏览量' AFTER `view_count`;
+-- ALTER TABLE `post` ADD INDEX `idx_is_top` (`is_top`);
+-- UPDATE `user` SET `role` = 'admin' WHERE `id` = 1;  -- 将ID=1的用户设为管理员

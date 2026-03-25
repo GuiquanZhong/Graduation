@@ -7,6 +7,7 @@ import com.smartforum.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -37,12 +38,13 @@ public class PostController {
     }
 
     /**
-     * 文章列表（分页，公开接口）
+     * 文章列表（分页，公开接口，支持排序：latest / hot）
      */
     @GetMapping("/list")
     public Result<?> getPostList(@RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        IPage<Post> result = postService.getPostList(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "latest") String sort) {
+        IPage<Post> result = postService.getPostList(page, size, sort);
         return Result.success(result);
     }
 
@@ -52,6 +54,8 @@ public class PostController {
     @GetMapping("/detail/{id}")
     public Result<?> getPostDetail(@PathVariable Long id,
             @RequestAttribute(value = "userId", required = false) Long userId) {
+        // 增加浏览量
+        postService.incrementViewCount(id);
         Post post = postService.getPostDetail(id, userId);
         return Result.success(post);
     }
@@ -65,6 +69,15 @@ public class PostController {
             @RequestParam(defaultValue = "10") int size) {
         IPage<Post> result = postService.searchPosts(keyword, page, size);
         return Result.success(result);
+    }
+
+    /**
+     * 热搜榜 Top10（公开接口）
+     */
+    @GetMapping("/hot-search")
+    public Result<?> getHotSearch() {
+        List<Map<String, Object>> list = postService.getHotSearchList();
+        return Result.success(list);
     }
 
     /**
@@ -98,3 +111,4 @@ public class PostController {
         return Result.success("删除成功");
     }
 }
+

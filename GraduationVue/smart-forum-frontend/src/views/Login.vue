@@ -12,7 +12,9 @@
       <!-- Logo & 标题 -->
       <div class="login-header">
         <div class="login-logo">
-          <el-icon :size="28"><Cpu /></el-icon>
+          <el-icon :size="28">
+            <Cpu />
+          </el-icon>
         </div>
         <h1>智能论坛</h1>
         <p>基于 AI 的智能社区交流平台</p>
@@ -21,56 +23,62 @@
       <!-- 切换 Tab -->
       <div class="tab-switch">
         <button :class="{ active: mode === 'login' }" @click="mode = 'login'">
-          <el-icon><Key /></el-icon>
+          <el-icon>
+            <Key />
+          </el-icon>
           登录
         </button>
         <button :class="{ active: mode === 'register' }" @click="mode = 'register'">
-          <el-icon><UserFilled /></el-icon>
+          <el-icon>
+            <UserFilled />
+          </el-icon>
           注册
         </button>
         <div class="tab-indicator" :style="{ left: mode === 'login' ? '4px' : 'calc(50% + 2px)' }"></div>
       </div>
 
       <!-- 登录表单 -->
-      <el-form v-if="mode === 'login'" :model="loginForm" :rules="loginRules" ref="loginRef"
-               @keyup.enter="handleLogin" class="auth-form">
+      <el-form v-if="mode === 'login'" :model="loginForm" :rules="loginRules" ref="loginRef" @keyup.enter="handleLogin"
+        class="auth-form">
         <el-form-item prop="username">
-          <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large"
-                    :prefix-icon="User" class="form-input" />
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large" :prefix-icon="User"
+            class="form-input" />
         </el-form-item>
         <el-form-item prop="password">
-          <el-input v-model="loginForm.password" type="password" placeholder="请输入密码"
-                    size="large" :prefix-icon="Lock" show-password class="form-input" />
+          <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" size="large" :prefix-icon="Lock"
+            show-password class="form-input" />
         </el-form-item>
-        <el-button type="primary" size="large" :loading="loading" @click="handleLogin"
-                   class="submit-btn">
-          <el-icon v-if="!loading"><Key /></el-icon>
+        <el-button type="primary" size="large" :loading="loading" @click="handleLogin" class="submit-btn">
+          <el-icon v-if="!loading">
+            <Key />
+          </el-icon>
           {{ loading ? '登录中...' : '登 录' }}
         </el-button>
       </el-form>
 
       <!-- 注册表单 -->
-      <el-form v-else :model="registerForm" :rules="registerRules" ref="registerRef"
-               @keyup.enter="handleRegister" class="auth-form">
+      <el-form v-else :model="registerForm" :rules="registerRules" ref="registerRef" @keyup.enter="handleRegister"
+        class="auth-form">
         <el-form-item prop="username">
-          <el-input v-model="registerForm.username" placeholder="请输入用户名（3-20位）" size="large"
-                    :prefix-icon="User" class="form-input" />
+          <el-input v-model="registerForm.username" placeholder="请输入用户名（3-20位）" size="large" :prefix-icon="User"
+            class="form-input" />
         </el-form-item>
         <el-form-item prop="nickname">
-          <el-input v-model="registerForm.nickname" placeholder="请输入昵称（选填）" size="large"
-                    :prefix-icon="UserFilled" class="form-input" />
+          <el-input v-model="registerForm.nickname" placeholder="请输入昵称（选填）" size="large" :prefix-icon="UserFilled"
+            class="form-input" />
         </el-form-item>
         <el-form-item prop="password">
-          <el-input v-model="registerForm.password" type="password" placeholder="请输入密码（至少6位）"
-                    size="large" :prefix-icon="Lock" show-password class="form-input" />
+          <el-input v-model="registerForm.password" type="password" placeholder="请输入密码（至少6位）" size="large"
+            :prefix-icon="Lock" show-password class="form-input" />
         </el-form-item>
         <el-form-item prop="confirmPassword">
-          <el-input v-model="registerForm.confirmPassword" type="password" placeholder="请再次输入密码"
-                    size="large" :prefix-icon="Lock" show-password class="form-input" />
+          <el-input v-model="registerForm.confirmPassword" type="password" placeholder="请再次输入密码" size="large"
+            :prefix-icon="Lock" show-password class="form-input" />
         </el-form-item>
-        <el-button type="primary" size="large" :loading="loading" @click="handleRegister"
-                   class="submit-btn">
-          <el-icon v-if="!loading"><UserFilled /></el-icon>
+        <el-button type="primary" size="large" :loading="loading" @click="handleRegister" class="submit-btn">
+          <el-icon v-if="!loading">
+            <UserFilled />
+          </el-icon>
           {{ loading ? '注册中...' : '注 册' }}
         </el-button>
       </el-form>
@@ -187,22 +195,28 @@ const handleRegister = async () => {
 }
 
 .bg-orb-1 {
-  width: 500px; height: 500px;
+  width: 500px;
+  height: 500px;
   background: rgba(99, 102, 241, 0.3);
-  top: -160px; left: -120px;
+  top: -160px;
+  left: -120px;
 }
 
 .bg-orb-2 {
-  width: 380px; height: 380px;
+  width: 380px;
+  height: 380px;
   background: rgba(139, 92, 246, 0.25);
-  bottom: -100px; right: -80px;
+  bottom: -100px;
+  right: -80px;
   animation-delay: 2.5s;
 }
 
 .bg-orb-3 {
-  width: 220px; height: 220px;
+  width: 220px;
+  height: 220px;
   background: rgba(167, 139, 250, 0.2);
-  top: 45%; left: 58%;
+  top: 45%;
+  left: 58%;
   animation-delay: 5s;
 }
 
@@ -210,8 +224,8 @@ const handleRegister = async () => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
@@ -235,7 +249,8 @@ const handleRegister = async () => {
 }
 
 .login-logo {
-  width: 68px; height: 68px;
+  width: 68px;
+  height: 68px;
   margin: 0 auto 18px;
   display: flex;
   align-items: center;

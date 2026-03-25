@@ -23,6 +23,15 @@ public class Post {
     @TableLogic
     private Integer isDeleted;
 
+    /** 是否置顶（0-否，1-是） */
+    private Integer isTop;
+
+    /** 浏览量 */
+    private Integer viewCount;
+
+    /** 今日浏览量 */
+    private Integer dailyViewCount;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
@@ -45,6 +54,10 @@ public class Post {
     @TableField(exist = false)
     private Long favoriteCount;
 
+    /** 评论数 */
+    @TableField(exist = false)
+    private Long commentCount;
+
     /** 当前用户是否已点赞 */
     @TableField(exist = false)
     private Boolean isLiked;
@@ -52,4 +65,9 @@ public class Post {
     /** 当前用户是否已收藏 */
     @TableField(exist = false)
     private Boolean isFavorited;
+
+    /** 热度分值（虚拟字段，用于排序） */
+    @TableField(exist = false)
+    private Double hotScore;
 }
+

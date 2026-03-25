@@ -7,6 +7,7 @@ export const useUserStore = defineStore('user', () => {
 
     const isLoggedIn = computed(() => !!token.value)
     const nickname = computed(() => userInfo.value?.nickname || '游客')
+    const isAdmin = computed(() => userInfo.value?.role === 'admin')
 
     function setLogin(data) {
         token.value = data.token
@@ -14,7 +15,8 @@ export const useUserStore = defineStore('user', () => {
             userId: data.userId,
             username: data.username,
             nickname: data.nickname,
-            avatar: data.avatar
+            avatar: data.avatar,
+            role: data.role
         }
         userInfo.value = info
         localStorage.setItem('token', data.token)
@@ -28,5 +30,6 @@ export const useUserStore = defineStore('user', () => {
         localStorage.removeItem('userInfo')
     }
 
-    return { userInfo, token, isLoggedIn, nickname, setLogin, logout }
+    return { userInfo, token, isLoggedIn, nickname, isAdmin, setLogin, logout }
 })
+

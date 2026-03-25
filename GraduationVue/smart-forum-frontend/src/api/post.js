@@ -1,7 +1,7 @@
 import request from './index'
 
-export function getPostList(page = 1, size = 10) {
-    return request.get('/post/list', { params: { page, size } })
+export function getPostList(page = 1, size = 10, sort = 'latest') {
+    return request.get('/post/list', { params: { page, size, sort } })
 }
 
 export function getPostDetail(id) {
@@ -23,3 +23,8 @@ export function updatePost(id, data) {
 export function deletePost(id) {
     return request.delete(`/post/delete/${id}`)
 }
+
+export function getHotSearch() {
+    return request.get('/post/hot-search')
+}
+

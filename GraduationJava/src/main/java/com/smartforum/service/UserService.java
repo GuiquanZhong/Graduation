@@ -1,6 +1,8 @@
 package com.smartforum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartforum.entity.User;
 import com.smartforum.mapper.UserMapper;
 import com.smartforum.utils.JwtUtils;
@@ -37,11 +39,13 @@ public class UserService {
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
         user.setNickname(nickname != null ? nickname : username);
+        user.setRole("user");
+        user.setStatus("active");
         userMapper.insert(user);
     }
 
     /**
-     * 用户登录，返回 Token 和用户信息
+     * 用户登录，返回 Token 和用户信息（含角色）
      */
     public Map<String, Object> login(String username, String password) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
@@ -52,6 +56,11 @@ public class UserService {
             throw new RuntimeException("用户名或密码错误");
         }
 
+        // 检查账号是否被封禁
+        if ("banned".equals(user.getStatus())) {
+            throw new RuntimeException("该账号已被封禁，请联系管理员");
+        }
+
         String token = jwtUtils.generateToken(user.getId(), user.getUsername());
 
         Map<String, Object> result = new HashMap<>();
@@ -60,6 +69,7 @@ public class UserService {
         result.put("username", user.getUsername());
         result.put("nickname", user.getNickname());
         result.put("avatar", user.getAvatar());
+        result.put("role", user.getRole());
         return result;
     }
 
@@ -102,4 +112,66 @@ public class UserService {
         updateUser.setPassword(passwordEncoder.encode(newPassword));
         userMapper.updateById(updateUser);
     }
+
+    // ============ 管理员功能 ============
+
+    /**
+     * 分页获取所有用户（管理员用）
+     */
+    public IPage<User> getAllUsers(int page, int size, String keyword) {
+        Page<User> pageParam = new Page<>(page, size);
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            wrapper.like(User::getUsername, keyword)
+                    .or().like(User::getNickname, keyword);
+        }
+        wrapper.orderByDesc(User::getCreatedAt);
+        IPage<User> result = userMapper.selectPage(pageParam, wrapper);
+        // 隐藏密码
+        result.getRecords().forEach(u -> u.setPassword(null));
+        return result;
+    }
+
+    /**
+     * 封禁用户（管理员用）
+     */
+    public void banUser(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if ("admin".equals(user.getRole())) {
+            throw new RuntimeException("不能封禁管理员账号");
+        }
+        User update = new User();
+        update.setId(userId);
+        update.setStatus("banned");
+        userMapper.updateById(update);
+    }
+
+    /**
+     * 解封用户（管理员用）
+     */
+    public void unbanUser(Long userId) {
+        User update = new User();
+        update.setId(userId);
+        update.setStatus("active");
+        userMapper.updateById(update);
+    }
+
+    /**
+     * 获取用户总数（管理员用）
+     */
+    public long getUserCount() {
+        return userMapper.selectCount(null);
+    }
+
+    /**
+     * 判断用户是否为管理员
+     */
+    public boolean isAdmin(Long userId) {
+        User user = userMapper.selectById(userId);
+        return user != null && "admin".equals(user.getRole());
+    }
 }
+

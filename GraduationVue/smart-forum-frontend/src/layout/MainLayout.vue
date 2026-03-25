@@ -6,19 +6,32 @@
         <div class="navbar-left">
           <router-link to="/" class="logo">
             <div class="logo-icon-wrapper">
-              <el-icon class="logo-icon"><Cpu /></el-icon>
+              <el-icon class="logo-icon">
+                <Cpu />
+              </el-icon>
             </div>
             <span class="logo-text">智能论坛</span>
           </router-link>
           <nav class="nav-links">
             <router-link to="/" class="nav-link" active-class="active">
-              <el-icon><House /></el-icon>
+              <el-icon>
+                <House />
+              </el-icon>
               <span>首页</span>
             </router-link>
             <router-link to="/ai-chat" class="nav-link" active-class="active">
-              <el-icon><ChatDotRound /></el-icon>
+              <el-icon>
+                <ChatDotRound />
+              </el-icon>
               <span>AI 问答</span>
               <span class="nav-badge">AI</span>
+            </router-link>
+            <router-link v-if="userStore.isAdmin" to="/admin" class="nav-link" active-class="active">
+              <el-icon>
+                <Setting />
+              </el-icon>
+              <span>管理后台</span>
+              <span class="nav-badge admin-badge">管理</span>
             </router-link>
           </nav>
         </div>
@@ -26,12 +39,15 @@
         <div class="navbar-right">
           <template v-if="userStore.isLoggedIn">
             <el-button type="primary" round @click="$router.push('/post/create')" class="create-btn">
-              <el-icon><Edit /></el-icon>
+              <el-icon>
+                <Edit />
+              </el-icon>
               <span>发布文章</span>
             </el-button>
             <el-dropdown trigger="click" @command="handleCommand" popper-class="user-dropdown">
               <div class="user-avatar-wrapper">
-                <el-avatar :size="38" :style="{ background: 'var(--gradient-primary)', fontSize: '15px', fontWeight: '700' }">
+                <el-avatar :size="38"
+                  :style="{ background: 'var(--gradient-primary)', fontSize: '15px', fontWeight: '700' }">
                   {{ userStore.nickname?.charAt(0) }}
                 </el-avatar>
                 <span class="online-dot"></span>
@@ -39,7 +55,8 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <div class="dropdown-user-info">
-                    <el-avatar :size="40" :style="{ background: 'var(--gradient-primary)', fontSize: '16px', fontWeight: '700' }">
+                    <el-avatar :size="40"
+                      :style="{ background: 'var(--gradient-primary)', fontSize: '16px', fontWeight: '700' }">
                       {{ userStore.nickname?.charAt(0) }}
                     </el-avatar>
                     <div>
@@ -48,11 +65,21 @@
                     </div>
                   </div>
                   <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>
+                    <el-icon>
+                      <User />
+                    </el-icon>
                     个人主页
                   </el-dropdown-item>
+                  <el-dropdown-item v-if="userStore.isAdmin" command="admin">
+                    <el-icon>
+                      <Setting />
+                    </el-icon>
+                    管理后台
+                  </el-dropdown-item>
                   <el-dropdown-item divided command="logout" class="logout-item">
-                    <el-icon><SwitchButton /></el-icon>
+                    <el-icon>
+                      <SwitchButton />
+                    </el-icon>
                     退出登录
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -80,7 +107,9 @@
     <footer class="footer">
       <div class="footer-inner">
         <div class="footer-logo">
-          <el-icon><Cpu /></el-icon>
+          <el-icon>
+            <Cpu />
+          </el-icon>
           <span>智能论坛</span>
         </div>
         <p class="footer-text">© 2026 智能论坛 · 基于 Spring Boot & Vue 3 & AI 构建</p>
@@ -100,7 +129,7 @@
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { User } from '@element-plus/icons-vue'
+import { User, Setting } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -108,6 +137,8 @@ const router = useRouter()
 const handleCommand = (cmd) => {
   if (cmd === 'profile') {
     router.push('/profile')
+  } else if (cmd === 'admin') {
+    router.push('/admin')
   } else if (cmd === 'logout') {
     ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
       confirmButtonText: '确定',
@@ -116,7 +147,7 @@ const handleCommand = (cmd) => {
     }).then(() => {
       userStore.logout()
       router.push('/')
-    }).catch(() => {})
+    }).catch(() => { })
   }
 }
 </script>
@@ -137,7 +168,7 @@ const handleCommand = (cmd) => {
   backdrop-filter: blur(24px) saturate(200%);
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .navbar-inner {
@@ -235,6 +266,10 @@ const handleCommand = (cmd) => {
   color: white;
   border-radius: 4px;
   letter-spacing: 0.3px;
+}
+
+.admin-badge {
+  background: linear-gradient(135deg, #ef4444, #f97316) !important;
 }
 
 /* Right Area */
@@ -369,7 +404,7 @@ const handleCommand = (cmd) => {
 .user-dropdown .el-dropdown-menu {
   border-radius: 12px !important;
   padding: 4px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
   border: 1px solid var(--border-light) !important;
   min-width: 180px !important;
 }
