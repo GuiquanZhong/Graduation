@@ -116,8 +116,15 @@
             </el-avatar>
             <div class="comment-body">
               <div class="comment-header">
-                <span class="comment-author clickable-author" @click="goToUser(comment.userId)">{{ comment.authorName }}</span>
-                <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
+                <div class="comment-header-left">
+                  <span class="comment-author clickable-author" @click="goToUser(comment.userId)">{{ comment.authorName }}</span>
+                  <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
+                </div>
+                <el-button v-if="userStore.isLoggedIn && userStore.userInfo?.userId == comment.userId"
+                           type="danger" text size="small"
+                           @click.stop="handleDeleteComment(comment.id)" class="delete-comment-btn">
+                  删除
+                </el-button>
               </div>
               <p class="comment-text">{{ comment.content }}</p>
             </div>
@@ -158,7 +165,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPostDetail, updatePost, deletePost } from '@/api/post'
-import { getComments, addComment } from '@/api/comment'
+import { getComments, addComment, deleteComment } from '@/api/comment'
 import { generateSummary } from '@/api/ai'
 import { toggleLike } from '@/api/like'
 import { toggleFavorite } from '@/api/favorite'
@@ -255,6 +262,24 @@ const handleAddComment = async () => {
   } finally {
     commentLoading.value = false
   }
+}
+
+const handleDeleteComment = async (commentId) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这条评论吗？', '确认删除', {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteComment(commentId)
+    ElMessage.success('评论已删除')
+    const res = await getComments(route.params.id)
+    comments.value = res.data
+  } catch { }
 }
 
 const handleLike = async () => {
@@ -622,8 +647,19 @@ const goToUser = (userId) => {
 .comment-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.comment-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.delete-comment-btn {
+  padding: 0 4px;
+  height: 20px;
 }
 
 .comment-author {
