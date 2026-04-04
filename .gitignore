@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Java 编译产物
+target/
+
+# IDE - IntelliJ IDEA (additional)
+*.xml~
+code-flicker-extension-storage-workspace.xml
+data_source_mapping.xml
+sqldialects.xml
+
+# 配置文件（含数据库密码等敏感信息）
+application.yml
+application-*.yml

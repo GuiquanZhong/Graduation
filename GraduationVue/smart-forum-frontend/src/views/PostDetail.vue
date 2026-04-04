@@ -51,11 +51,11 @@
         <!-- 文章内容左下角交互按钮 -->
         <div class="article-interact-row">
           <button class="mini-interact-btn" :class="{ active: post.isLiked }" @click="handleLike">
-            <el-icon :size="14"><component :is="post.isLiked ? 'StarFilled' : 'Star'" /></el-icon>
+            <Icon :icon="post.isLiked ? 'mdi:thumb-up' : 'mdi:thumb-up-outline'" width="14" height="14" />
             <span>{{ post.likeCount || 0 }}</span>
           </button>
           <button class="mini-interact-btn" :class="{ active: post.isFavorited }" @click="handleFavorite">
-            <el-icon :size="14"><component :is="post.isFavorited ? 'CollectionTag' : 'Collection'" /></el-icon>
+            <Icon :icon="post.isFavorited ? 'mdi:heart' : 'mdi:heart-outline'" width="14" height="14" />
             <span>{{ post.favoriteCount || 0 }}</span>
           </button>
           <button class="mini-interact-btn summary-btn" :class="{ loading: summaryLoading }" @click="handleGenerateSummary" :disabled="summaryLoading">
@@ -170,7 +170,8 @@ import { generateSummary } from '@/api/ai'
 import { toggleLike } from '@/api/like'
 import { toggleFavorite } from '@/api/favorite'
 import { useUserStore } from '@/stores/user'
-import { ArrowLeft, Clock, MagicStick, ChatLineSquare, Star, StarFilled, Collection, CollectionTag, Edit, Delete, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, Clock, MagicStick, ChatLineSquare, Edit, Delete, Check } from '@element-plus/icons-vue'
+import { Icon } from '@iconify/vue'
 
 const route = useRoute()
 const router = useRouter()
