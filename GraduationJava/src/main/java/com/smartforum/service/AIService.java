@@ -1,15 +1,22 @@
 package com.smartforum.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.smartforum.entity.Post;
+import com.smartforum.mapper.PostMapper;
 import okhttp3.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class AIService {
@@ -22,6 +29,9 @@ public class AIService {
 
     @Value("${ai.model}")
     private String model;
+
+    @Autowired
+    private PostMapper postMapper;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -56,19 +66,74 @@ public class AIService {
     }
 
     /**
-     * 开放式智能问答
+     * 基于帖子内容的多轮问答
+     *
+     * @param postTitle   帖子标题
+     * @param postContent 帖子正文
+     * @param history     对话历史
      */
-    public String chat(String question) {
-        String systemPrompt = "你是智能论坛的AI助手，博学多才，擅长回答各类问题。请用清晰、专业、友好的语言回答用户的问题。如果问题涉及代码，请使用Markdown格式展示代码块。";
-        return callAI(systemPrompt, question);
+    public String postChat(String postTitle, String postContent, List<Map<String, String>> history) {
+        String systemPrompt = "你是一个专业的阅读助手。用户正在阅读一篇帖子，请根据帖子内容回答用户提出的问题。" +
+                "回答应简洁、准确、友好，且仅基于帖子内容作答。如果帖子内容中没有相关信息，请如实告知用户。\n\n" +
+                "=== 帖子标题 ===\n" + postTitle + "\n\n" +
+                "=== 帖子内容 ===\n" + postContent;
+        return callAIWithHistory(systemPrompt, history);
     }
 
     /**
-     * 调用 MiniMax API
+     * 多轮对话智能问答（支持上下文历史 + 热门帖子推荐）
+     *
+     * @param history 对话历史，每条格式 {"role": "user"/"assistant", "content": "..."}
+     */
+    public String chat(List<Map<String, String>> history) {
+        String hotPostsInfo = buildHotPostsInfo();
+        String systemPrompt = "你是「智能论坛」的 AI 助手，博学多才，擅长回答各类问题。" +
+                "请用清晰、专业、友好的语言回答用户的问题。如果问题涉及代码，请使用 Markdown 格式展示代码块。\n\n" +
+                "以下是论坛当前的热门帖子（按热度排序），当用户询问推荐、热门帖子等相关问题时，请结合这些信息回答：\n" +
+                hotPostsInfo;
+        return callAIWithHistory(systemPrompt, history);
+    }
+
+    /**
+     * 查询热门帖子并格式化为文本
+     */
+    private String buildHotPostsInfo() {
+        try {
+            LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByDesc(Post::getViewCount)
+                    .orderByDesc(Post::getCreatedAt)
+                    .last("LIMIT 10");
+            List<Post> hotPosts = postMapper.selectList(wrapper);
+            if (hotPosts == null || hotPosts.isEmpty()) {
+                return "（暂无热门帖子数据）";
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < hotPosts.size(); i++) {
+                Post p = hotPosts.get(i);
+                sb.append(i + 1).append(". 《").append(p.getTitle()).append("》");
+                if (p.getSummary() != null && !p.getSummary().isBlank()) {
+                    sb.append(" - ").append(p.getSummary());
+                }
+                sb.append("（浏览量：").append(p.getViewCount()).append("）\n");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "（热门帖子数据暂时不可用）";
+        }
+    }
+
+    /**
+     * 调用 MiniMax API（单轮，用于摘要/标题/润色）
      */
     private String callAI(String systemPrompt, String userMessage) {
+        return callAIWithHistory(systemPrompt, List.of(Map.of("role", "user", "content", userMessage)));
+    }
+
+    /**
+     * 调用 MiniMax API（多轮，支持完整对话历史）
+     */
+    private String callAIWithHistory(String systemPrompt, List<Map<String, String>> history) {
         try {
-            // 构建请求体
             ObjectNode requestBody = objectMapper.createObjectNode();
             requestBody.put("model", model);
 
@@ -81,12 +146,15 @@ public class AIService {
             systemMsg.put("content", systemPrompt);
             messages.add(systemMsg);
 
-            // user 消息
-            ObjectNode userMsg = objectMapper.createObjectNode();
-            userMsg.put("role", "user");
-            userMsg.put("name", "用户");
-            userMsg.put("content", userMessage);
-            messages.add(userMsg);
+            // 历史对话消息
+            for (Map<String, String> msg : history) {
+                ObjectNode msgNode = objectMapper.createObjectNode();
+                String role = msg.get("role");
+                msgNode.put("role", "assistant".equals(role) ? "assistant" : "user");
+                msgNode.put("name", "assistant".equals(role) ? "AI助手" : "用户");
+                msgNode.put("content", msg.get("content"));
+                messages.add(msgNode);
+            }
 
             requestBody.set("messages", messages);
             requestBody.put("max_completion_tokens", 2048);

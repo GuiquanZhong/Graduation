@@ -215,6 +215,20 @@ public class UserController {
     }
 
     /**
+     * 修改头像（需登录）
+     */
+    @PutMapping("/avatar")
+    public Result<?> updateAvatar(@RequestAttribute("userId") Long userId,
+            @RequestBody Map<String, String> params) {
+        String avatar = params.get("avatar");
+        if (avatar == null || avatar.trim().isEmpty()) {
+            return Result.error("头像地址不能为空");
+        }
+        userService.updateAvatar(userId, avatar.trim());
+        return Result.success("头像修改成功");
+    }
+
+    /**
      * 修改昵称（需登录）
      */
     @PutMapping("/nickname")

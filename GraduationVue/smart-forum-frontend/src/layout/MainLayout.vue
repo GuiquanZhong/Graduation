@@ -46,7 +46,7 @@
             </el-button>
             <el-dropdown trigger="click" @command="handleCommand" popper-class="user-dropdown">
               <div class="user-avatar-wrapper">
-                <el-avatar :size="38"
+                <el-avatar :size="38" :src="userStore.userInfo?.avatar"
                   :style="{ background: 'var(--gradient-primary)', fontSize: '15px', fontWeight: '700' }">
                   {{ userStore.nickname?.charAt(0) }}
                 </el-avatar>
@@ -55,7 +55,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <div class="dropdown-user-info">
-                    <el-avatar :size="40"
+                    <el-avatar :size="40" :src="userStore.userInfo?.avatar"
                       :style="{ background: 'var(--gradient-primary)', fontSize: '16px', fontWeight: '700' }">
                       {{ userStore.nickname?.charAt(0) }}
                     </el-avatar>

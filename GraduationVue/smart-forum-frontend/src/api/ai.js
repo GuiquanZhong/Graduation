@@ -12,6 +12,10 @@ export function polishContent(content) {
   return request.post('/ai/polish', { content })
 }
 
-export function aiChat(question) {
-  return request.post('/ai/chat', { question })
+export function aiChat(history) {
+  return request.post('/ai/chat', { history })
+}
+
+export function aiPostChat(postTitle, postContent, history) {
+  return request.post('/ai/post-chat', { postTitle, postContent, history })
 }

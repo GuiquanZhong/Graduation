@@ -5,6 +5,7 @@ import com.smartforum.service.AIService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -54,15 +55,37 @@ public class AIController {
     }
 
     /**
-     * AI 智能问答
+     * AI 智能问答（支持多轮对话历史）
+     * 请求体格式：{ "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}] }
      */
     @PostMapping("/chat")
-    public Result<?> chat(@RequestBody Map<String, String> params) {
-        String question = params.get("question");
-        if (question == null || question.trim().isEmpty()) {
-            return Result.error("问题不能为空");
+    public Result<?> chat(@RequestBody Map<String, Object> params) {
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> history = (List<Map<String, String>>) params.get("history");
+        if (history == null || history.isEmpty()) {
+            return Result.error("消息历史不能为空");
         }
-        String answer = aiService.chat(question);
+        String answer = aiService.chat(history);
+        return Result.success(answer);
+    }
+
+    /**
+     * 基于帖子内容的多轮问答
+     * 请求体格式：{ "postTitle": "...", "postContent": "...", "history": [...] }
+     */
+    @PostMapping("/post-chat")
+    public Result<?> postChat(@RequestBody Map<String, Object> params) {
+        String postTitle = (String) params.get("postTitle");
+        String postContent = (String) params.get("postContent");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> history = (List<Map<String, String>>) params.get("history");
+        if (postContent == null || postContent.trim().isEmpty()) {
+            return Result.error("帖子内容不能为空");
+        }
+        if (history == null || history.isEmpty()) {
+            return Result.error("消息历史不能为空");
+        }
+        String answer = aiService.postChat(postTitle == null ? "" : postTitle, postContent, history);
         return Result.success(answer);
     }
 }

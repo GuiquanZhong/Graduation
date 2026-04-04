@@ -47,11 +47,12 @@ public class CommentService {
                 .orderByAsc(Comment::getCreatedAt);
         List<Comment> comments = commentMapper.selectList(wrapper);
 
-        // 填充评论者昵称
+        // 填充评论者昵称和头像
         comments.forEach(comment -> {
             User user = userMapper.selectById(comment.getUserId());
             if (user != null) {
                 comment.setAuthorName(user.getNickname());
+                comment.setAuthorAvatar(user.getAvatar());
             }
         });
 
@@ -68,11 +69,12 @@ public class CommentService {
                 .orderByDesc(Comment::getCreatedAt);
         IPage<Comment> result = commentMapper.selectPage(pageParam, wrapper);
 
-        // 填充评论者昵称和关联帖子标题
+        // 填充评论者昵称和头像和关联帖子标题
         result.getRecords().forEach(comment -> {
             User user = userMapper.selectById(comment.getUserId());
             if (user != null) {
                 comment.setAuthorName(user.getNickname());
+                comment.setAuthorAvatar(user.getAvatar());
             }
             // 填充帖子标题
             Post post = postMapper.selectById(comment.getPostId());

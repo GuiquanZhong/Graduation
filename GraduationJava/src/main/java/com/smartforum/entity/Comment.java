@@ -24,6 +24,10 @@ public class Comment {
     @TableField(exist = false)
     private String authorName;
 
+    /** 关联查询时填充的评论者头像，非数据库字段 */
+    @TableField(exist = false)
+    private String authorAvatar;
+
     /** 关联查询时填充的帖子标题，非数据库字段 */
     @TableField(exist = false)
     private String postTitle;

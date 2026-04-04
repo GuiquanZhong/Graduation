@@ -115,9 +115,9 @@ const chatLoading = ref(false)
 const messagesRef = ref()
 
 const quickPrompts = [
-  '什么是 Spring Boot？',
+  '推荐几篇热门帖子',
+  '论坛最近有什么有趣的讨论？',
   '解释一下 JWT 认证原理',
-  'Vue 3 Composition API 有什么优势？',
   '帮我写一段 Java 排序算法'
 ]
 
@@ -140,8 +140,14 @@ const handleSend = async () => {
   chatLoading.value = true
   scrollToBottom()
 
+  // 构造完整对话历史（role 用 user/assistant 与后端对齐）
+  const history = messages.value.map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.content
+  }))
+
   try {
-    const res = await aiChat(text)
+    const res = await aiChat(history)
     messages.value.push({ role: 'ai', content: res.data })
   } catch {
     messages.value.push({ role: 'ai', content: '抱歉，AI 服务暂时不可用，请稍后再试。' })

@@ -81,6 +81,16 @@ public class UserService {
     }
 
     /**
+     * 修改头像
+     */
+    public void updateAvatar(Long userId, String avatarUrl) {
+        User user = new User();
+        user.setId(userId);
+        user.setAvatar(avatarUrl);
+        userMapper.updateById(user);
+    }
+
+    /**
      * 修改昵称
      */
     public void updateNickname(Long userId, String nickname) {

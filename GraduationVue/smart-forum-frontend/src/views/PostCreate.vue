@@ -49,14 +49,11 @@
             </el-tooltip>
           </div>
         </div>
-        <div class="content-editor">
-          <el-input v-model="content" type="textarea" :rows="18"
-                    placeholder="在这里写下你的文章内容，支持 Markdown 格式..."
-                    resize="none" class="content-textarea" />
-          <div class="editor-footer">
-            <span class="char-count">{{ content.length }} 字</span>
-          </div>
-        </div>
+        <MdEditor v-model="content" :height="720" language="zh-CN"
+                  placeholder="在这里写下你的文章内容，支持 Markdown 格式..."
+                  class="md-editor-custom"
+                  :toolbars="toolbars"
+                  @onUploadImg="handleUploadImg" />
       </div>
 
       <!-- AI 提示卡 -->
@@ -91,13 +88,25 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MdEditor } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import { createPost } from '@/api/post'
 import { generateTitle, polishContent } from '@/api/ai'
+import { uploadImage } from '@/api/upload'
 import { Edit, MagicStick, Brush, Promotion, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const title = ref('')
 const content = ref('')
+
+const toolbars = [
+  'bold', 'underline', 'italic', 'strikeThrough', '-',
+  'title', 'sub', 'sup', 'quote', '-',
+  'unorderedList', 'orderedList', 'task', '-',
+  'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-',
+  'revoke', 'next', '=',
+  'pageFullscreen', 'fullscreen', 'preview', 'catalog'
+]
 const titleLoading = ref(false)
 const polishLoading = ref(false)
 const submitLoading = ref(false)
@@ -133,6 +142,20 @@ const handlePolish = async () => {
   }
 }
 
+const handleUploadImg = async (files, callback) => {
+  const urls = []
+  for (const file of files) {
+    try {
+      const res = await uploadImage(file)
+      urls.push(res.data)
+    } catch {
+      ElMessage.error('图片上传失败')
+      urls.push('')
+    }
+  }
+  callback(urls)
+}
+
 const handleSubmit = async () => {
   if (!title.value.trim() || !content.value.trim()) {
     ElMessage.warning('标题和内容不能为空')
@@ -151,7 +174,7 @@ const handleSubmit = async () => {
 
 <style scoped>
 .post-create-page {
-  max-width: 860px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -268,42 +291,11 @@ const handleSubmit = async () => {
   border-radius: 8px !important;
 }
 
-/* ===== Content Editor ===== */
-.content-editor {
-  border: 1px solid var(--border);
+/* ===== Markdown Editor ===== */
+.md-editor-custom {
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.2s;
-}
-
-.content-editor:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.content-textarea :deep(.el-textarea__inner) {
-  border: none !important;
-  border-radius: 0 !important;
-  padding: 16px 18px !important;
-  font-size: 15px !important;
-  line-height: 1.8 !important;
-  box-shadow: none !important;
-  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
-  resize: none !important;
-}
-
-.editor-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 8px 16px;
-  background: var(--bg-subtle);
-  border-top: 1px solid var(--border-light);
-}
-
-.char-count {
-  font-size: 12px;
-  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 /* ===== AI Hint Card ===== */

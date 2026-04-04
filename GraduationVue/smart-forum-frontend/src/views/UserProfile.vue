@@ -3,10 +3,16 @@
     <!-- 个人信息卡片 -->
     <div class="profile-card fade-in-up">
       <div class="profile-header">
-        <div class="profile-avatar">
-          <el-avatar :size="80" :style="{ background: 'var(--gradient-primary)', fontSize: '32px' }">
-            {{ userStore.nickname?.charAt(0) }}
-          </el-avatar>
+        <div class="profile-avatar" @click="openProfileEditDialog('avatar')" style="cursor:pointer;">
+          <div class="avatar-wrapper">
+            <el-avatar :size="80" :src="userStore.userInfo?.avatar"
+                       :style="{ background: 'var(--gradient-primary)', fontSize: '32px' }">
+              {{ userStore.nickname?.charAt(0) }}
+            </el-avatar>
+            <div class="avatar-hover-mask">
+              <el-icon :size="20"><Camera /></el-icon>
+            </div>
+          </div>
         </div>
         <div class="profile-info">
           <h1 class="profile-name">{{ userStore.nickname }}</h1>
@@ -19,7 +25,7 @@
           </p>
         </div>
         <div class="profile-actions">
-          <el-button type="primary" plain round @click="openProfileEditDialog">
+          <el-button type="primary" plain round @click="openProfileEditDialog()">
             <el-icon><Edit /></el-icon> 编辑资料
           </el-button>
         </div>
@@ -190,6 +196,27 @@
   <!-- 编辑资料对话框 -->
   <el-dialog v-model="profileEditDialogVisible" title="编辑资料" width="480px" :close-on-click-modal="false">
     <el-tabs v-model="profileEditTab" class="profile-edit-tabs">
+      <!-- 修改头像 -->
+      <el-tab-pane label="修改头像" name="avatar">
+        <div class="edit-section">
+          <div class="avatar-upload-area">
+            <el-avatar :size="90" :src="userStore.userInfo?.avatar"
+                       :style="{ background: 'var(--gradient-primary)', fontSize: '36px', display: 'block', margin: '0 auto 16px' }">
+              {{ userStore.nickname?.charAt(0) }}
+            </el-avatar>
+            <input ref="avatarInputRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+                   style="display:none" @change="handleAvatarFileChange" />
+            <el-button type="primary" plain :loading="avatarLoading" @click="avatarInputRef.click()" style="width:100%">
+              <el-icon><Camera /></el-icon>
+              选择图片
+            </el-button>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:10px;text-align:center">
+              支持 jpg/png/gif/webp，大小不超过 5MB
+            </p>
+          </div>
+        </div>
+      </el-tab-pane>
+
       <!-- 修改昵称 -->
       <el-tab-pane label="修改昵称" name="nickname">
         <div class="edit-section">
@@ -260,9 +287,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { getUserFavoritePosts } from '@/api/favorite'
 import { getUserLikedPosts } from '@/api/like'
-import { getUserProfile, getUserPosts, getUserComments, getUserInfo, updateNickname, changePassword } from '@/api/user'
+import { getUserProfile, getUserPosts, getUserComments, getUserInfo, updateNickname, changePassword, updateAvatar } from '@/api/user'
 import { updatePost, deletePost } from '@/api/post'
-import { Calendar, Star, Flag, Clock, Document, ChatLineSquare, Edit, Delete } from '@element-plus/icons-vue'
+import { uploadImage } from '@/api/upload'
+import { Calendar, Star, Flag, Clock, Document, ChatLineSquare, Edit, Delete, Camera } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -292,6 +320,8 @@ const oldPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const passwordLoading = ref(false)
+const avatarLoading = ref(false)
+const avatarInputRef = ref(null)
 
 // 编辑帖子相关
 const postEditDialogVisible = ref(false)
@@ -381,13 +411,36 @@ const handlePageChange = (page) => {
   loadData()
 }
 
+// 头像上传
+const handleAvatarFileChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  avatarLoading.value = true
+  try {
+    const res = await uploadImage(file)
+    const avatarUrl = res.data
+    await updateAvatar(avatarUrl)
+    if (userStore.userInfo) {
+      const updated = { ...userStore.userInfo, avatar: avatarUrl }
+      userStore.userInfo = updated
+      localStorage.setItem('userInfo', JSON.stringify(updated))
+    }
+    ElMessage.success('头像更新成功 ✨')
+  } catch {
+    ElMessage.error('头像上传失败')
+  } finally {
+    avatarLoading.value = false
+    if (avatarInputRef.value) avatarInputRef.value.value = ''
+  }
+}
+
 // 编辑资料
-const openProfileEditDialog = () => {
+const openProfileEditDialog = (tab = 'nickname') => {
   newNickname.value = userStore.nickname
   oldPassword.value = ''
   newPassword.value = ''
   confirmPassword.value = ''
-  profileEditTab.value = 'nickname'
+  profileEditTab.value = tab
   profileEditDialogVisible.value = true
 }
 
@@ -544,6 +597,33 @@ const getAvatarColor = (name) => {
 .profile-avatar {
   flex-shrink: 0;
   margin-top: 60px;
+}
+
+.avatar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar-hover-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.avatar-wrapper:hover .avatar-hover-mask {
+  opacity: 1;
+}
+
+.avatar-upload-area {
+  text-align: center;
+  padding: 8px 0;
 }
 
 .profile-avatar :deep(.el-avatar) {

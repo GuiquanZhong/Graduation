@@ -42,7 +42,7 @@
 
       <!-- 文章内容 -->
       <div class="article-content fade-in-up" style="animation-delay:0.12s">
-        <div class="article-body" v-html="renderContent(post.content)"></div>
+        <MdPreview :modelValue="post.content" class="md-preview-custom" />
         <!-- AI 摘要展示（生成后显示） -->
         <div v-if="post.summary" class="ai-summary-content">
           <el-icon class="quote-icon"><MagicStick /></el-icon>
@@ -77,7 +77,7 @@
 
         <!-- 评论输入 -->
         <div class="comment-input-wrapper" v-if="userStore.isLoggedIn">
-          <el-avatar :size="38" :style="{ background: 'var(--gradient-primary)', fontSize: '14px', fontWeight: '700', flexShrink: 0 }">
+          <el-avatar :size="38" :src="userStore.userInfo?.avatar" :style="{ background: 'var(--gradient-primary)', fontSize: '14px', fontWeight: '700', flexShrink: 0 }">
             {{ userStore.nickname?.charAt(0) }}
           </el-avatar>
           <div class="comment-input-area">
@@ -109,7 +109,7 @@
           </div>
           <div v-for="(comment, idx) in comments" :key="comment.id"
                class="comment-item fade-in-up" :style="{ animationDelay: idx * 0.04 + 's' }">
-            <el-avatar :size="38"
+            <el-avatar :size="38" :src="comment.authorAvatar"
                        :style="{ background: getAvatarColor(comment.authorName), fontSize: '14px', fontWeight: '700', flexShrink: 0 }"
                        class="clickable-author" @click="goToUser(comment.userId)">
               {{ comment.authorName?.charAt(0) || '?' }}
@@ -144,7 +144,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">文章内容</label>
-        <el-input v-model="editContent" type="textarea" :rows="14" placeholder="请输入文章内容" resize="vertical" />
+        <MdEditor v-model="editContent" :height="420" language="zh-CN" />
       </div>
     </div>
     <template #footer>
@@ -158,15 +158,72 @@
       </div>
     </template>
   </el-dialog>
+
+  <!-- AI 悬浮按钮 -->
+  <div v-if="post" class="ai-fab" @click="openAiChat" title="问问 AI">
+    <span class="ai-fab-text">AI</span>
+  </div>
+
+  <!-- AI 问帖对话弹窗 -->
+  <div v-if="aiChatVisible" class="ai-chat-overlay" @click.self="aiChatVisible = false">
+    <div class="ai-chat-panel">
+      <div class="ai-chat-header">
+        <div class="ai-chat-title">
+          <span class="ai-chat-icon">✨</span>
+          AI 帖子助手
+        </div>
+        <button class="ai-chat-close" @click="aiChatVisible = false">✕</button>
+      </div>
+      <div class="ai-chat-body" ref="aiChatBody">
+        <div v-for="(msg, idx) in aiMessages" :key="idx"
+             class="ai-msg-row" :class="msg.role === 'user' ? 'user-row' : 'ai-row'">
+          <div v-if="msg.role === 'assistant'" class="ai-avatar">AI</div>
+          <div class="ai-msg-bubble" :class="msg.role === 'user' ? 'user-bubble' : 'ai-bubble'">
+            {{ msg.content }}
+          </div>
+          <div v-if="msg.role === 'user'" class="user-avatar">
+            <el-avatar :size="30" :src="userStore.userInfo?.avatar"
+                       :style="{ background: 'linear-gradient(135deg, #f59e0b, #ec4899)', fontSize: '12px', fontWeight: '700' }">
+              {{ userStore.nickname?.charAt(0) || '我' }}
+            </el-avatar>
+          </div>
+        </div>
+        <div v-if="aiLoading" class="ai-msg-row ai-row">
+          <div class="ai-avatar">AI</div>
+          <div class="ai-msg-bubble ai-bubble ai-typing">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+      <div class="ai-chat-footer">
+        <el-input
+          v-model="aiInputText"
+          type="textarea"
+          :rows="2"
+          placeholder="输入问题，Enter 发送，Shift+Enter 换行"
+          resize="none"
+          class="ai-input"
+          @keydown="handleAiInputKeydown"
+          :disabled="aiLoading"
+        />
+        <el-button type="primary" :loading="aiLoading" @click="sendAiMessage"
+                   :disabled="!aiInputText.trim() || aiLoading" class="ai-send-btn" round>
+          发送
+        </el-button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MdEditor, MdPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import { getPostDetail, updatePost, deletePost } from '@/api/post'
 import { getComments, addComment, deleteComment } from '@/api/comment'
-import { generateSummary } from '@/api/ai'
+import { generateSummary, aiPostChat } from '@/api/ai'
 import { toggleLike } from '@/api/like'
 import { toggleFavorite } from '@/api/favorite'
 import { useUserStore } from '@/stores/user'
@@ -311,13 +368,6 @@ const handleFavorite = async () => {
   } catch { }
 }
 
-const renderContent = (content) => {
-  if (!content) return ''
-  return content
-    .replace(/\n/g, '<br>')
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-}
-
 const formatTime = (time) => {
   if (!time) return ''
   return new Date(time).toLocaleString('zh-CN', {
@@ -333,6 +383,57 @@ const getAvatarColor = (name) => {
 
 const goToUser = (userId) => {
   if (userId) router.push(`/user/${userId}`)
+}
+
+// ===== AI 问帖对话 =====
+const aiChatVisible = ref(false)
+const aiMessages = ref([])
+const aiInputText = ref('')
+const aiLoading = ref(false)
+const aiChatBody = ref(null)
+
+const openAiChat = () => {
+  if (aiMessages.value.length === 0) {
+    aiMessages.value = [{
+      role: 'assistant',
+      content: `你好！我已阅读这篇帖子《${post.value?.title}》，有什么想问的吗？例如：这篇帖子讲了什么、主角是谁等。`
+    }]
+  }
+  aiChatVisible.value = true
+}
+
+const scrollAiToBottom = () => {
+  setTimeout(() => {
+    if (aiChatBody.value) {
+      aiChatBody.value.scrollTop = aiChatBody.value.scrollHeight
+    }
+  }, 50)
+}
+
+const sendAiMessage = async () => {
+  const text = aiInputText.value.trim()
+  if (!text || aiLoading.value) return
+  aiMessages.value.push({ role: 'user', content: text })
+  aiInputText.value = ''
+  aiLoading.value = true
+  scrollAiToBottom()
+  try {
+    const history = aiMessages.value.map(m => ({ role: m.role, content: m.content }))
+    const res = await aiPostChat(post.value?.title || '', post.value?.content || '', history)
+    aiMessages.value.push({ role: 'assistant', content: res.data })
+  } catch {
+    aiMessages.value.push({ role: 'assistant', content: '抱歉，AI 暂时无法回答，请稍后重试。' })
+  } finally {
+    aiLoading.value = false
+    scrollAiToBottom()
+  }
+}
+
+const handleAiInputKeydown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendAiMessage()
+  }
 }
 </script>
 
@@ -455,27 +556,11 @@ const goToUser = (userId) => {
   box-shadow: var(--shadow-sm);
 }
 
-.article-body {
+.md-preview-custom {
+  background: transparent !important;
+  padding: 0 !important;
   font-size: 16px;
   line-height: 1.9;
-  color: var(--text-primary);
-  word-wrap: break-word;
-}
-
-.article-body :deep(pre) {
-  background: #1a1a2e;
-  color: #e2e8f0;
-  padding: 20px;
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-  margin: 20px 0;
-  font-size: 14px;
-  line-height: 1.6;
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.article-body :deep(code) {
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }
 
 /* ===== Article Interact Row ===== */
@@ -707,5 +792,220 @@ const goToUser = (userId) => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* ===== AI Floating Button ===== */
+.ai-fab {
+  position: fixed;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+  z-index: 1000;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.ai-fab:hover {
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.6);
+}
+
+.ai-fab-text {
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+
+/* ===== AI Chat Panel ===== */
+.ai-chat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.ai-chat-panel {
+  pointer-events: all;
+  position: fixed;
+  right: 96px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 380px;
+  max-height: 560px;
+  background: var(--bg-card, #fff);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border-light, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInRight 0.22s ease;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateY(-50%) translateX(20px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+.ai-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  flex-shrink: 0;
+}
+
+.ai-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ai-chat-icon {
+  font-size: 16px;
+}
+
+.ai-chat-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.ai-chat-close:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+.ai-chat-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.ai-msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.user-row {
+  flex-direction: row-reverse;
+}
+
+.ai-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-avatar {
+  flex-shrink: 0;
+}
+
+.ai-msg-bubble {
+  max-width: 76%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-bubble {
+  background: var(--bg-subtle, #f3f4f6);
+  color: var(--text-primary, #111);
+  border-bottom-left-radius: 4px;
+}
+
+.user-bubble {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* Typing dots */
+.ai-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.ai-typing span {
+  width: 7px;
+  height: 7px;
+  background: #8b5cf6;
+  border-radius: 50%;
+  display: inline-block;
+  animation: typingBounce 1.2s infinite ease-in-out;
+}
+
+.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.ai-chat-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-light, #e5e7eb);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.ai-input {
+  flex: 1;
+}
+
+.ai-input :deep(.el-textarea__inner) {
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  resize: none !important;
+}
+
+.ai-send-btn {
+  font-weight: 600 !important;
+  height: 36px;
+  padding: 0 16px !important;
 }
 </style>

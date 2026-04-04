@@ -56,6 +56,10 @@ export function updateNickname(nickname) {
     return request.put('/user/nickname', { nickname })
 }
 
+export function updateAvatar(avatar) {
+    return request.put('/user/avatar', { avatar })
+}
+
 export function changePassword(oldPassword, newPassword) {
     return request.put('/user/password', { oldPassword, newPassword })
 }
