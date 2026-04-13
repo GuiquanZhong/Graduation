@@ -177,6 +177,23 @@ public class UserService {
     }
 
     /**
+     * 修改用户角色（管理员用）
+     */
+    public void updateRole(Long targetId, String role) {
+        if (!"user".equals(role) && !"admin".equals(role)) {
+            throw new RuntimeException("角色值非法");
+        }
+        User user = userMapper.selectById(targetId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        User update = new User();
+        update.setId(targetId);
+        update.setRole(role);
+        userMapper.updateById(update);
+    }
+
+    /**
      * 判断用户是否为管理员
      */
     public boolean isAdmin(Long userId) {

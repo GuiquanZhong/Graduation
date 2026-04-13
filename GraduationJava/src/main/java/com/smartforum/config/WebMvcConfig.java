@@ -28,6 +28,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/user/*/favorites",
                         "/api/user/*/likes",
                         "/api/user/*/following",
-                        "/api/user/*/followers");
+                        "/api/user/*/followers",
+                        "/api/ai/search");
     }
 }

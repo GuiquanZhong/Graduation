@@ -9,7 +9,7 @@
           </div>
           <div>
             <h1 class="admin-title">管理后台</h1>
-            <p class="admin-subtitle">管理用户、帖子和查看数据统计</p>
+            <p class="admin-subtitle">管理用户、帖子、举报和查看数据统计</p>
           </div>
         </div>
       </div>
@@ -44,6 +44,15 @@
           <span class="stat-label">当前日期</span>
         </div>
       </div>
+      <div class="stat-card stat-card-reports">
+        <div class="stat-icon-wrapper">
+          <el-icon :size="22"><WarnTriangleFilled /></el-icon>
+        </div>
+        <div class="stat-info">
+          <span class="stat-value">{{ stats.pendingReportCount || 0 }}</span>
+          <span class="stat-label">待处理举报</span>
+        </div>
+      </div>
     </div>
 
     <!-- Tab 切换 -->
@@ -55,6 +64,11 @@
       <div class="tab-item" :class="{ active: activeTab === 'posts' }" @click="activeTab = 'posts'">
         <el-icon><Document /></el-icon>
         <span>帖子管理</span>
+      </div>
+      <div class="tab-item" :class="{ active: activeTab === 'reports' }" @click="switchToReports">
+        <el-icon><WarnTriangleFilled /></el-icon>
+        <span>举报管理</span>
+        <span v-if="stats.pendingReportCount > 0" class="report-badge">{{ stats.pendingReportCount }}</span>
       </div>
     </div>
 
@@ -97,7 +111,7 @@
               {{ formatDate(row.createdAt) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="160" align="center">
+          <el-table-column label="操作" min-width="220" align="center">
             <template #default="{ row }">
               <template v-if="row.role !== 'admin'">
                 <el-button v-if="row.status === 'active'" type="danger" size="small" round plain
@@ -107,8 +121,15 @@
                 <el-button v-else type="success" size="small" round plain @click="handleUnban(row)">
                   <el-icon><Unlock /></el-icon>解封
                 </el-button>
+                <el-button type="warning" size="small" round plain @click="handleSetAdmin(row)">
+                  <el-icon><UserFilled /></el-icon>设为管理员
+                </el-button>
               </template>
-              <span v-else class="admin-label">—</span>
+              <template v-else>
+                <el-button type="info" size="small" round plain @click="handleSetUser(row)">
+                  <el-icon><User /></el-icon>取消管理员
+                </el-button>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -181,6 +202,86 @@
           :total="postTotal" @current-change="handlePostPageChange" />
       </div>
     </div>
+
+    <!-- 举报管理 -->
+    <div v-if="activeTab === 'reports'" class="admin-section">
+      <div class="section-toolbar">
+        <el-radio-group v-model="reportStatusFilter" @change="loadReports" size="small">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="pending">待处理</el-radio-button>
+          <el-radio-button value="approved">举报成立</el-radio-button>
+          <el-radio-button value="rejected">已驳回</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <div class="table-wrapper">
+        <el-table :data="reports" stripe style="width: 100%" v-loading="loadingReports"
+          :header-cell-style="{ background: '#f7f8fc', color: '#3d4155', fontWeight: 600 }">
+          <el-table-column prop="id" label="ID" width="70" align="center" />
+          <el-table-column label="被举报帖子" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="clickable-title" @click="goToPost(row.postId)">{{ row.postTitle }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="举报人" width="110">
+            <template #default="{ row }">{{ row.reporterName }}</template>
+          </el-table-column>
+          <el-table-column label="举报原因" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag :type="reasonTagType(row.reason)" size="small" round>{{ reasonLabel(row.reason) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="description" label="补充说明" min-width="140" show-overflow-tooltip />
+          <el-table-column label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row.status)" size="small" effect="plain" round>
+                {{ statusLabel(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="举报时间" width="160">
+            <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" align="center">
+            <template #default="{ row }">
+              <template v-if="row.status === 'pending'">
+                <el-button type="success" size="small" round plain @click="openHandleDialog(row, 'approved')">
+                  成立
+                </el-button>
+                <el-button type="info" size="small" round plain @click="openHandleDialog(row, 'rejected')">
+                  驳回
+                </el-button>
+              </template>
+              <span v-else class="handled-note">{{ row.handleNote || '-' }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="pagination-wrapper">
+        <el-pagination background layout="prev, pager, next" :current-page="reportPage" :page-size="reportPageSize"
+          :total="reportTotal" @current-change="handleReportPageChange" />
+      </div>
+    </div>
+
+    <!-- 举报处理弹窗 -->
+    <el-dialog v-model="handleDialogVisible" :title="handleAction === 'approved' ? '确认举报成立' : '驳回举报'" width="400px">
+      <div style="margin-bottom: 12px; color: #64748b; font-size: 14px;">
+        被举报帖子：<strong>{{ currentReport?.postTitle }}</strong>
+      </div>
+      <el-input v-model="handleNote" type="textarea" :rows="3"
+        :placeholder="handleAction === 'approved' ? '请填写处理备注（如：违规内容已删除）' : '请填写驳回理由（选填）'"
+        maxlength="200" show-word-limit resize="none" />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleDialogVisible = false" round>取消</el-button>
+          <el-button :type="handleAction === 'approved' ? 'success' : 'info'" :loading="handleLoading"
+            @click="submitHandle" round>
+            {{ handleAction === 'approved' ? '确认成立' : '确认驳回' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -190,17 +291,16 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Setting, User, Document, Calendar, Search, Lock, Unlock,
-  View, Star, ChatDotRound, Top, Delete
+  View, Star, ChatDotRound, Top, Delete, UserFilled, WarnTriangleFilled
 } from '@element-plus/icons-vue'
-import { getAdminStats, getAdminUsers, banUser, unbanUser, getAdminPosts, adminDeletePost, toggleTopPost } from '@/api/admin'
+import { getAdminStats, getAdminUsers, banUser, unbanUser, updateUserRole, getAdminPosts, adminDeletePost, toggleTopPost, getAdminReports, handleReport } from '@/api/admin'
 
 const router = useRouter()
 
-// 统计
 const stats = ref({})
 
-// 用户管理
 const activeTab = ref('users')
+
 const users = ref([])
 const loadingUsers = ref(false)
 const userPage = ref(1)
@@ -208,13 +308,25 @@ const userPageSize = ref(10)
 const userTotal = ref(0)
 const userKeyword = ref('')
 
-// 帖子管理
 const posts = ref([])
 const loadingPosts = ref(false)
 const postPage = ref(1)
 const postPageSize = ref(10)
 const postTotal = ref(0)
 const postKeyword = ref('')
+
+const reports = ref([])
+const loadingReports = ref(false)
+const reportPage = ref(1)
+const reportPageSize = ref(10)
+const reportTotal = ref(0)
+const reportStatusFilter = ref('all')
+
+const handleDialogVisible = ref(false)
+const handleAction = ref('')
+const handleNote = ref('')
+const handleLoading = ref(false)
+const currentReport = ref(null)
 
 onMounted(() => {
   loadStats()
@@ -226,7 +338,7 @@ const loadStats = async () => {
   try {
     const res = await getAdminStats()
     stats.value = res.data
-  } catch (e) { /* ignore */ }
+  } catch (e) { }
 }
 
 const loadUsers = async () => {
@@ -251,6 +363,22 @@ const loadPosts = async () => {
   }
 }
 
+const loadReports = async () => {
+  loadingReports.value = true
+  try {
+    const res = await getAdminReports(reportPage.value, reportPageSize.value, reportStatusFilter.value)
+    reports.value = res.data.records
+    reportTotal.value = Number(res.data.total)
+  } finally {
+    loadingReports.value = false
+  }
+}
+
+const switchToReports = () => {
+  activeTab.value = 'reports'
+  loadReports()
+}
+
 const handleUserPageChange = (page) => {
   userPage.value = page
   loadUsers()
@@ -259,6 +387,11 @@ const handleUserPageChange = (page) => {
 const handlePostPageChange = (page) => {
   postPage.value = page
   loadPosts()
+}
+
+const handleReportPageChange = (page) => {
+  reportPage.value = page
+  loadReports()
 }
 
 const handleBan = async (user) => {
@@ -271,7 +404,7 @@ const handleBan = async (user) => {
     await banUser(user.id)
     ElMessage.success('已封禁')
     loadUsers()
-  } catch { /* cancelled */ }
+  } catch { }
 }
 
 const handleUnban = async (user) => {
@@ -284,7 +417,33 @@ const handleUnban = async (user) => {
     await unbanUser(user.id)
     ElMessage.success('已解封')
     loadUsers()
-  } catch { /* cancelled */ }
+  } catch { }
+}
+
+const handleSetAdmin = async (user) => {
+  try {
+    await ElMessageBox.confirm(`确定要将 "${user.nickname || user.username}" 设为管理员吗？`, '设为管理员', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await updateUserRole(user.id, 'admin')
+    ElMessage.success('已设为管理员')
+    loadUsers()
+  } catch { }
+}
+
+const handleSetUser = async (user) => {
+  try {
+    await ElMessageBox.confirm(`确定要取消 "${user.nickname || user.username}" 的管理员权限吗？`, '取消管理员', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await updateUserRole(user.id, 'user')
+    ElMessage.success('已取消管理员权限')
+    loadUsers()
+  } catch { }
 }
 
 const handleToggleTop = async (post) => {
@@ -292,7 +451,7 @@ const handleToggleTop = async (post) => {
     await toggleTopPost(post.id)
     ElMessage.success(post.isTop === 1 ? '已取消置顶' : '已置顶')
     loadPosts()
-  } catch { /* ignore */ }
+  } catch { }
 }
 
 const handleDeletePost = async (post) => {
@@ -306,7 +465,49 @@ const handleDeletePost = async (post) => {
     ElMessage.success('已删除')
     loadPosts()
     loadStats()
-  } catch { /* cancelled */ }
+  } catch { }
+}
+
+const openHandleDialog = (report, action) => {
+  currentReport.value = report
+  handleAction.value = action
+  handleNote.value = ''
+  handleDialogVisible.value = true
+}
+
+const submitHandle = async () => {
+  handleLoading.value = true
+  try {
+    await handleReport(currentReport.value.id, handleAction.value, handleNote.value)
+    ElMessage.success(handleAction.value === 'approved' ? '已标记举报成立' : '已驳回举报')
+    handleDialogVisible.value = false
+    loadReports()
+    loadStats()
+  } catch {
+    ElMessage.error('操作失败')
+  } finally {
+    handleLoading.value = false
+  }
+}
+
+const reasonLabel = (reason) => {
+  const map = { spam: '垃圾广告', porn: '色情低俗', fake: '虚假信息', abuse: '辱骂攻击', other: '其他' }
+  return map[reason] || reason
+}
+
+const reasonTagType = (reason) => {
+  const map = { spam: 'warning', porn: 'danger', fake: 'info', abuse: 'danger', other: '' }
+  return map[reason] || ''
+}
+
+const statusLabel = (status) => {
+  const map = { pending: '待处理', approved: '举报成立', rejected: '已驳回' }
+  return map[status] || status
+}
+
+const statusTagType = (status) => {
+  const map = { pending: 'warning', approved: 'success', rejected: 'info' }
+  return map[status] || ''
 }
 
 const goToPost = (id) => router.push(`/post/${id}`)
@@ -385,7 +586,7 @@ const formatDate = (time) => {
 /* ===== Stats ===== */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -426,6 +627,10 @@ const formatDate = (time) => {
 
 .stat-card-date .stat-icon-wrapper {
   background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.stat-card-reports .stat-icon-wrapper {
+  background: linear-gradient(135deg, #ef4444, #f97316);
 }
 
 .stat-info {
@@ -474,6 +679,7 @@ const formatDate = (time) => {
   color: #64748b;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .tab-item:hover {
@@ -484,6 +690,18 @@ const formatDate = (time) => {
   background: white;
   color: #6366f1;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.report-badge {
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 16px;
 }
 
 /* ===== Section ===== */
@@ -555,6 +773,12 @@ const formatDate = (time) => {
   color: #64748b;
 }
 
+/* ===== Handled note ===== */
+.handled-note {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 /* ===== Pagination ===== */
 .pagination-wrapper {
   display: flex;
@@ -565,5 +789,11 @@ const formatDate = (time) => {
 /* ===== Admin Badge in navbar (global supplement) ===== */
 .admin-badge {
   background: linear-gradient(135deg, #ef4444, #f97316) !important;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

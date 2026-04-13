@@ -37,6 +37,11 @@
               <el-icon><Delete /></el-icon> 删除
             </el-button>
           </div>
+          <div class="meta-right" v-else-if="userStore.isLoggedIn">
+            <el-button size="small" plain @click="openReportDialog" class="report-btn" :class="{ reported: hasReported }">
+              <el-icon><WarnTriangleFilled /></el-icon> {{ hasReported ? '已举报' : '举报' }}
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -86,10 +91,17 @@
                       class="comment-textarea" />
             <div class="comment-input-footer">
               <span class="comment-chars">{{ commentText.length }}/500</span>
-              <el-button type="primary" round :loading="commentLoading" @click="handleAddComment"
-                         :disabled="!commentText.trim()" size="small" class="comment-submit-btn">
-                发表评论
-              </el-button>
+              <div class="comment-footer-actions">
+                <el-button size="small" round plain :loading="commentSuggestLoading"
+                           @click="handleCommentSuggest" class="ai-suggest-btn">
+                  <el-icon :size="12"><MagicStick /></el-icon>
+                  AI 辅助
+                </el-button>
+                <el-button type="primary" round :loading="commentLoading" @click="handleAddComment"
+                           :disabled="!commentText.trim()" size="small" class="comment-submit-btn">
+                  发表评论
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -159,6 +171,34 @@
     </template>
   </el-dialog>
 
+  <!-- 举报弹窗 -->
+  <el-dialog v-model="reportDialogVisible" title="举报帖子" width="440px" border-radius="16px">
+    <div class="report-form">
+      <div class="form-group">
+        <label class="form-label">举报原因 <span style="color:#ef4444">*</span></label>
+        <el-radio-group v-model="reportReason" class="report-radio-group">
+          <el-radio value="spam">垃圾广告</el-radio>
+          <el-radio value="porn">色情低俗</el-radio>
+          <el-radio value="fake">虚假信息</el-radio>
+          <el-radio value="abuse">辱骂攻击</el-radio>
+          <el-radio value="other">其他</el-radio>
+        </el-radio-group>
+      </div>
+      <div class="form-group">
+        <label class="form-label">补充说明（选填）</label>
+        <el-input v-model="reportDescription" type="textarea" :rows="3" placeholder="请描述具体情况..." maxlength="200" show-word-limit resize="none" />
+      </div>
+    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="reportDialogVisible = false" round>取消</el-button>
+        <el-button type="danger" :loading="reportLoading" @click="handleSubmitReport" :disabled="!reportReason" round>
+          提交举报
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
   <!-- AI 悬浮按钮 -->
   <div v-if="post" class="ai-fab" @click="openAiChat" title="问问 AI">
     <span class="ai-fab-text">AI</span>
@@ -223,11 +263,12 @@ import { MdEditor, MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { getPostDetail, updatePost, deletePost } from '@/api/post'
 import { getComments, addComment, deleteComment } from '@/api/comment'
-import { generateSummary, aiPostChat } from '@/api/ai'
+import { generateSummary, aiPostChat, aiCommentSuggest } from '@/api/ai'
 import { toggleLike } from '@/api/like'
 import { toggleFavorite } from '@/api/favorite'
+import { submitReport, checkReported } from '@/api/report'
 import { useUserStore } from '@/stores/user'
-import { ArrowLeft, Clock, MagicStick, ChatLineSquare, Edit, Delete, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, Clock, MagicStick, ChatLineSquare, Edit, Delete, Check, WarnTriangleFilled } from '@element-plus/icons-vue'
 import { Icon } from '@iconify/vue'
 
 const route = useRoute()
@@ -239,11 +280,18 @@ const loading = ref(true)
 const summaryLoading = ref(false)
 const commentText = ref('')
 const commentLoading = ref(false)
+const commentSuggestLoading = ref(false)
 
 const editDialogVisible = ref(false)
 const editTitle = ref('')
 const editContent = ref('')
 const editLoading = ref(false)
+
+const reportDialogVisible = ref(false)
+const reportReason = ref('')
+const reportDescription = ref('')
+const reportLoading = ref(false)
+const hasReported = ref(false)
 
 const isAuthor = computed(() => {
   return userStore.isLoggedIn && post.value && userStore.userInfo?.userId == post.value.userId
@@ -257,6 +305,12 @@ onMounted(async () => {
     ])
     post.value = postRes.data
     comments.value = commentRes.data
+    if (userStore.isLoggedIn) {
+      try {
+        const reportRes = await checkReported(route.params.id)
+        hasReported.value = reportRes.data
+      } catch { }
+    }
   } finally {
     loading.value = false
   }
@@ -296,6 +350,40 @@ const handleDeletePost = async () => {
     ElMessage.success('文章已删除')
     router.push('/')
   } catch { }
+}
+
+const openReportDialog = () => {
+  if (hasReported.value) return
+  reportReason.value = ''
+  reportDescription.value = ''
+  reportDialogVisible.value = true
+}
+
+const handleSubmitReport = async () => {
+  reportLoading.value = true
+  try {
+    await submitReport(post.value.id, reportReason.value, reportDescription.value)
+    hasReported.value = true
+    reportDialogVisible.value = false
+    ElMessage.success('举报已提交，感谢您的反馈')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '举报失败，请稍后再试')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+const handleCommentSuggest = async () => {
+  commentSuggestLoading.value = true
+  try {
+    const existingComments = comments.value.slice(0, 5).map(c => c.content).join('\n')
+    const res = await aiCommentSuggest(post.value.title, post.value.content, existingComments)
+    commentText.value = res.data
+  } catch {
+    ElMessage.error('AI 辅助失败，请稍后再试')
+  } finally {
+    commentSuggestLoading.value = false
+  }
 }
 
 const handleGenerateSummary = async () => {
@@ -527,6 +615,23 @@ const handleAiInputKeydown = (e) => {
   border-color: rgba(239, 68, 68, 0.3) !important;
 }
 
+.report-btn {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #92400e !important;
+}
+
+.report-btn.reported {
+  border-color: rgba(156, 163, 175, 0.3) !important;
+  color: #9ca3af !important;
+  cursor: default;
+}
+
+.report-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ===== AI Summary ===== */
 .ai-summary-content {
   margin-bottom: 16px;
@@ -675,6 +780,21 @@ const handleAiInputKeydown = (e) => {
   align-items: center;
   justify-content: space-between;
   margin-top: 10px;
+}
+
+.comment-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-suggest-btn {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: var(--primary) !important;
+}
+
+.ai-suggest-btn:hover {
+  background: var(--primary-bg) !important;
 }
 
 .comment-chars {

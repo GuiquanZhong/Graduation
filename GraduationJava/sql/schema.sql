@@ -4,7 +4,6 @@ COLLATE utf8mb4_unicode_ci;
 
 USE smart_forum;
 
-SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ================= 用户表 =================
@@ -117,6 +116,42 @@ CREATE TABLE IF NOT EXISTS `user_follow` (
         FOREIGN KEY (`followed_id`) REFERENCES `user` (`id`)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户关注表';
+
+CREATE TABLE `ai_chat_session` (
+                                   `id`         BIGINT       NOT NULL AUTO_INCREMENT,
+                                   `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+                                   `title`      VARCHAR(200) NOT NULL DEFAULT '新对话',
+                                   `messages`   LONGTEXT     NOT NULL,
+                                   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE
+                                               CURRENT_TIMESTAMP,
+                                   PRIMARY KEY (`id`),
+                                   KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI聊天会话表';
+
+
+-- ================= 举报表 =================
+CREATE TABLE IF NOT EXISTS `post_report` (
+    `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '举报ID',
+    `post_id`     BIGINT       NOT NULL COMMENT '被举报帖子ID',
+    `reporter_id` BIGINT       NOT NULL COMMENT '举报人ID',
+    `reason`      VARCHAR(50)  NOT NULL COMMENT '举报原因(spam-垃圾广告,porn-色情低俗,fake-虚假信息,abuse-辱骂攻击,other-其他)',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '举报补充说明',
+    `status`      VARCHAR(20)  NOT NULL DEFAULT 'pending' COMMENT '处理状态(pending-待处理,approved-举报成立,rejected-举报驳回)',
+    `handle_note` VARCHAR(500) DEFAULT NULL COMMENT '管理员处理备注',
+    `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '举报时间',
+    `handled_at`  DATETIME     DEFAULT NULL COMMENT '处理时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reporter_post` (`reporter_id`, `post_id`),
+    KEY `idx_post_id` (`post_id`),
+    KEY `idx_status` (`status`),
+    CONSTRAINT `fk_report_post`
+        FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
+        ON DELETE CASCADE,
+    CONSTRAINT `fk_report_reporter`
+        FOREIGN KEY (`reporter_id`) REFERENCES `user` (`id`)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子举报表';
 
 
 SET FOREIGN_KEY_CHECKS = 1;

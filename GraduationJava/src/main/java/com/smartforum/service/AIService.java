@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,12 @@ public class AIService {
 
     @Value("${ai.model}")
     private String model;
+
+    @Value("${siliconflow.api-url}")
+    private String sfApiUrl;
+
+    @Value("${siliconflow.api-key}")
+    private String sfApiKey;
 
     @Autowired
     private PostMapper postMapper;
@@ -119,6 +126,122 @@ public class AIService {
             return sb.toString();
         } catch (Exception e) {
             return "（热门帖子数据暂时不可用）";
+        }
+    }
+
+    /**
+     * 根据帖子内容和已有评论，生成评论建议（MiniMax）
+     */
+    public String suggestComment(String postTitle, String postContent, String existingComments) {
+        String systemPrompt = "你是一个论坛评论助手。请根据帖子标题、内容以及已有评论，生成一条有价值、友好的评论建议。" +
+                "要求：简洁自然，不超过100字，直接返回评论文本，不要包含任何前缀说明。";
+        String userMsg = "帖子标题：" + postTitle + "\n\n帖子内容摘要：" +
+                postContent.substring(0, Math.min(500, postContent.length())) +
+                (existingComments == null || existingComments.isBlank() ? "" : "\n\n已有评论：\n" + existingComments);
+        return callAI(systemPrompt, userMsg);
+    }
+
+    /**
+     * 语义搜索帖子（GLM-5，返回帖子ID列表）
+     */
+    public List<Long> semanticSearch(String query) {
+        try {
+            LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
+            wrapper.orderByDesc(Post::getCreatedAt).last("LIMIT 100");
+            List<Post> posts = postMapper.selectList(wrapper);
+            if (posts.isEmpty()) return List.of();
+
+            StringBuilder sb = new StringBuilder();
+            for (Post p : posts) {
+                sb.append("ID:").append(p.getId())
+                  .append(" 标题:《").append(p.getTitle()).append("》");
+                if (p.getSummary() != null && !p.getSummary().isBlank()) {
+                    sb.append(" 摘要:").append(p.getSummary());
+                }
+                sb.append("\n");
+            }
+
+            String systemPrompt = "你是一个帖子语义搜索引擎。根据用户的搜索意图，从帖子列表中找出最相关的帖子。" +
+                    "只返回帖子ID，用英文逗号分隔，最多返回5个，按相关度从高到低排列。不要返回任何其他内容。" +
+                    "如果没有相关帖子，返回空字符串。\n\n帖子列表：\n" + sb;
+            String result = callSiliconFlow(systemPrompt,
+                    List.of(Map.of("role", "user", "content", "搜索：" + query)),
+                    "Pro/zai-org/GLM-5");
+            if (result == null || result.isBlank()) return List.of();
+            return Arrays.stream(result.split(","))
+                    .map(String::trim)
+                    .filter(s -> s.matches("\\d+"))
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * 硅基流动多轮对话（支持指定模型）
+     */
+    public String chatWithModel(List<Map<String, String>> history, String modelId) {
+        String hotPostsInfo = buildHotPostsInfo();
+        String systemPrompt = "你是「智能论坛」的 AI 助手，博学多才，擅长回答各类问题。" +
+                "请用清晰、专业、友好的语言回答用户的问题。如果问题涉及代码，请使用 Markdown 格式展示代码块。\n\n" +
+                "以下是论坛当前的热门帖子（按热度排序），当用户询问推荐、热门帖子等相关问题时，请结合这些信息回答：\n" +
+                hotPostsInfo;
+        return callSiliconFlow(systemPrompt, history, modelId);
+    }
+
+    /**
+     * 调用硅基流动 API（标准 OpenAI 格式）
+     */
+    private String callSiliconFlow(String systemPrompt, List<Map<String, String>> history, String modelId) {
+        try {
+            ObjectNode requestBody = objectMapper.createObjectNode();
+            requestBody.put("model", modelId);
+
+            ArrayNode messages = objectMapper.createArrayNode();
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", systemPrompt);
+            messages.add(systemMsg);
+
+            for (Map<String, String> msg : history) {
+                ObjectNode msgNode = objectMapper.createObjectNode();
+                msgNode.put("role", "assistant".equals(msg.get("role")) ? "assistant" : "user");
+                msgNode.put("content", msg.get("content"));
+                messages.add(msgNode);
+            }
+
+            requestBody.set("messages", messages);
+            requestBody.put("max_tokens", 2048);
+            requestBody.put("temperature", 0.7);
+
+            String jsonBody = objectMapper.writeValueAsString(requestBody);
+
+            Request request = new Request.Builder()
+                    .url(sfApiUrl)
+                    .addHeader("Authorization", "Bearer " + sfApiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new RuntimeException("硅基流动 API 调用失败，状态码: " + response.code());
+                }
+                String responseBody = response.body().string();
+                JsonNode jsonNode = objectMapper.readTree(responseBody);
+                JsonNode choices = jsonNode.get("choices");
+                if (choices != null && choices.size() > 0) {
+                    JsonNode message = choices.get(0).get("message");
+                    if (message != null) {
+                        return message.get("content").asText();
+                    }
+                }
+                throw new RuntimeException("硅基流动 API 返回格式异常");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("硅基流动 API 调用异常: " + e.getMessage(), e);
         }
     }
 

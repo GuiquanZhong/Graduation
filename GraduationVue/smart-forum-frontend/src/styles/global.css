@@ -348,3 +348,7 @@ a:hover {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
+
+.ai-search-append-btn.is-loading::before {
+  display: none !important;
+}

@@ -1,7 +1,9 @@
 package com.smartforum.controller;
 
 import com.smartforum.common.Result;
+import com.smartforum.entity.Post;
 import com.smartforum.service.AIService;
+import com.smartforum.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +16,9 @@ public class AIController {
 
     @Autowired
     private AIService aiService;
+
+    @Autowired
+    private PostService postService;
 
     /**
      * AI 生成摘要
@@ -65,7 +70,13 @@ public class AIController {
         if (history == null || history.isEmpty()) {
             return Result.error("消息历史不能为空");
         }
-        String answer = aiService.chat(history);
+        String model = (String) params.get("model");
+        String answer;
+        if (model != null && !model.isBlank()) {
+            answer = aiService.chatWithModel(history, model);
+        } else {
+            answer = aiService.chat(history);
+        }
         return Result.success(answer);
     }
 
@@ -87,5 +98,36 @@ public class AIController {
         }
         String answer = aiService.postChat(postTitle == null ? "" : postTitle, postContent, history);
         return Result.success(answer);
+    }
+
+    @PostMapping("/comment-suggest")
+    public Result<?> commentSuggest(@RequestBody Map<String, String> params) {
+        String postTitle = params.getOrDefault("postTitle", "");
+        String postContent = params.getOrDefault("postContent", "");
+        String existingComments = params.getOrDefault("existingComments", "");
+        if (postContent.trim().isEmpty()) {
+            return Result.error("帖子内容不能为空");
+        }
+        String suggestion = aiService.suggestComment(postTitle, postContent, existingComments);
+        return Result.success(suggestion);
+    }
+
+    @GetMapping("/search")
+    public Result<?> semanticSearch(@RequestParam String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return Result.error("搜索内容不能为空");
+        }
+        List<Long> ids = aiService.semanticSearch(query.trim());
+        if (ids.isEmpty()) {
+            return Result.success(java.util.List.of());
+        }
+        List<Post> posts = ids.stream()
+                .map(id -> {
+                    try { return postService.getPostDetail(id); }
+                    catch (Exception e) { return null; }
+                })
+                .filter(p -> p != null)
+                .collect(java.util.stream.Collectors.toList());
+        return Result.success(posts);
     }
 }

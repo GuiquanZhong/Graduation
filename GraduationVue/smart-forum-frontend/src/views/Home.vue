@@ -11,16 +11,28 @@
       </div>
 
       <div class="hero-content">
-        <!-- 搜索框（替换原badge位置） -->
+        <!-- 搜索框 -->
         <div class="hero-search-area" ref="searchWrapperRef">
-          <div class="hero-search">
+          <!-- Tab 切换 -->
+          <div class="search-tabs">
+            <div class="search-tab" :class="{ active: searchMode === 'normal' }" @click="searchMode = 'normal'">
+              <el-icon><Search /></el-icon>
+              <span>搜索</span>
+            </div>
+            <div class="search-tab ai-tab" :class="{ active: searchMode === 'ai' }" @click="searchMode = 'ai'">
+              <el-icon><MagicStick /></el-icon>
+              <span>AI 增强搜索</span>
+              <span class="new-badge">new</span>
+            </div>
+          </div>
+
+          <!-- 普通搜索 -->
+          <div v-if="searchMode === 'normal'" class="hero-search">
             <el-input v-model="searchKeyword" placeholder="搜索文章标题或内容..." size="large"
               @keyup.enter="handleSearch" clearable @clear="loadPosts"
               @focus="showHotSearch = true">
               <template #prefix>
-                <el-icon>
-                  <Search />
-                </el-icon>
+                <el-icon><Search /></el-icon>
               </template>
               <template #append>
                 <el-button @click="handleSearch" type="primary">搜索</el-button>
@@ -28,9 +40,22 @@
             </el-input>
           </div>
 
-          <!-- 热搜弹窗 -->
+          <!-- AI 搜索 -->
+          <div v-else class="hero-search">
+            <el-input v-model="aiSearchKeyword" placeholder="支持输入任意自然语句进行搜索..." size="large"
+              @keyup.enter="handleAiSearch" clearable :maxlength="500" show-word-limit>
+              <template #append>
+                <el-button @click="handleAiSearch" :loading="aiSearchLoading" class="ai-search-append-btn">
+                  <el-icon v-if="!aiSearchLoading"><Search /></el-icon>
+                  搜索
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+
+          <!-- 热搜弹窗（仅普通搜索模式） -->
           <transition name="hot-search-fade">
-            <div v-if="showHotSearch && hotSearchList.length > 0" class="hot-search-panel">
+            <div v-if="searchMode === 'normal' && showHotSearch && hotSearchList.length > 0" class="hot-search-panel">
               <div class="hot-search-header">
                 <div class="hot-search-title">
                   <el-icon><TrendCharts /></el-icon>
@@ -91,14 +116,17 @@
       <div class="section-header">
         <div class="section-title">
           <div class="title-indicator"></div>
-          <h2>{{ isSearching ? '搜索结果' : (sortMode === 'hot' ? '最热文章' : '最新文章') }}</h2>
+          <h2>{{ isAiSearching ? 'AI 搜索结果' : isSearching ? '搜索结果' : (sortMode === 'hot' ? '最热文章' : '最新文章') }}</h2>
         </div>
         <div class="section-actions">
-          <el-tag v-if="isSearching" closable @close="clearSearch" type="primary" effect="plain" round>
+          <el-tag v-if="isAiSearching" closable @close="clearAiSearch" type="primary" effect="plain" round>
+            <el-icon style="margin-right:3px"><MagicStick /></el-icon>
+            「{{ lastAiQuery }}」· {{ aiSearchResults.length }} 条结果
+          </el-tag>
+          <el-tag v-else-if="isSearching" closable @close="clearSearch" type="primary" effect="plain" round>
             "{{ searchKeyword }}" · {{ total }} 条结果
           </el-tag>
           <template v-else>
-            <!-- 排序切换 -->
             <div class="sort-toggle">
               <div class="sort-btn" :class="{ active: sortMode === 'latest' }" @click="switchSort('latest')">
                 <el-icon><Clock /></el-icon>
@@ -114,25 +142,23 @@
         </div>
       </div>
 
-      <div v-if="loading" class="loading-state">
+      <div v-if="loading || aiSearchLoading" class="loading-state">
         <div v-for="i in 4" :key="i" class="skeleton-card">
           <el-skeleton :rows="3" animated />
         </div>
       </div>
 
-      <div v-else-if="posts.length === 0" class="empty-state">
-        <el-empty description="暂无文章，快来发布第一篇吧！">
-          <el-button type="primary" round @click="$router.push('/post/create')">
-            <el-icon>
-              <Edit />
-            </el-icon>
+      <div v-else-if="displayPosts.length === 0" class="empty-state">
+        <el-empty :description="isAiSearching ? '没有找到相关帖子' : '暂无文章，快来发布第一篇吧！'">
+          <el-button v-if="!isAiSearching" type="primary" round @click="$router.push('/post/create')">
+            <el-icon><Edit /></el-icon>
             发布文章
           </el-button>
         </el-empty>
       </div>
 
       <template v-else>
-        <div class="post-card fade-in-up" v-for="(post, index) in posts" :key="post.id"
+        <div class="post-card fade-in-up" v-for="(post, index) in displayPosts" :key="post.id"
           :style="{ animationDelay: index * 0.05 + 's' }" @click="$router.push(`/post/${post.id}`)">
           <div class="post-card-body">
             <div class="post-card-top">
@@ -144,41 +170,48 @@
                 <ArrowRight />
               </el-icon>
             </div>
-            <p class="post-excerpt">{{ getExcerpt(post.content) }}</p>
-            <div class="post-meta">
-              <div class="post-author clickable-author" @click.stop="goToUser(post.userId)">
-                <el-avatar :size="26" :src="post.authorAvatar"
-                  :style="{ background: getAvatarColor(post.authorName), fontSize: '12px', fontWeight: '700' }">
-                  {{ post.authorName?.charAt(0) || '?' }}
-                </el-avatar>
-                <span class="author-name">{{ post.authorName || '匿名' }}</span>
+            <div class="post-card-content">
+              <div class="post-text">
+                <p class="post-excerpt">{{ getExcerpt(post.content) }}</p>
+                <div class="post-meta">
+                  <div class="post-author clickable-author" @click.stop="goToUser(post.userId)">
+                    <el-avatar :size="26" :src="post.authorAvatar"
+                      :style="{ background: getAvatarColor(post.authorName), fontSize: '12px', fontWeight: '700' }">
+                      {{ post.authorName?.charAt(0) || '?' }}
+                    </el-avatar>
+                    <span class="author-name">{{ post.authorName || '匿名' }}</span>
+                  </div>
+                  <div class="post-meta-right">
+                    <span class="post-stat-inline" title="浏览量">
+                      <el-icon><View /></el-icon>
+                      {{ post.viewCount || 0 }}
+                    </span>
+                    <span class="post-stat-inline" title="点赞">
+                      <el-icon><Star /></el-icon>
+                      {{ post.likeCount || 0 }}
+                    </span>
+                    <span class="post-stat-inline" title="评论">
+                      <el-icon><ChatDotRound /></el-icon>
+                      {{ post.commentCount || 0 }}
+                    </span>
+                    <span class="post-time">
+                      <el-icon>
+                        <Clock />
+                      </el-icon>
+                      {{ formatTime(post.createdAt) }}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div class="post-meta-right">
-                <span class="post-stat-inline" title="浏览量">
-                  <el-icon><View /></el-icon>
-                  {{ post.viewCount || 0 }}
-                </span>
-                <span class="post-stat-inline" title="点赞">
-                  <el-icon><Star /></el-icon>
-                  {{ post.likeCount || 0 }}
-                </span>
-                <span class="post-stat-inline" title="评论">
-                  <el-icon><ChatDotRound /></el-icon>
-                  {{ post.commentCount || 0 }}
-                </span>
-                <span class="post-time">
-                  <el-icon>
-                    <Clock />
-                  </el-icon>
-                  {{ formatTime(post.createdAt) }}
-                </span>
+              <div v-if="getCoverImage(post.content)" class="post-cover">
+                <img :src="getCoverImage(post.content)" alt="封面" loading="lazy" />
               </div>
             </div>
           </div>
         </div>
 
         <!-- 分页 -->
-        <div class="pagination-wrapper">
+        <div v-if="!isAiSearching" class="pagination-wrapper">
           <el-pagination background layout="prev, pager, next" :current-page="currentPage" :page-size="pageSize"
             :total="total" @current-change="handlePageChange" />
         </div>
@@ -188,10 +221,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getPostList, searchPosts, getHotSearch } from '@/api/post'
-import { Search, Clock, ArrowRight, Edit, TrendCharts, View, Star, ChatDotRound, Close } from '@element-plus/icons-vue'
+import { aiSemanticSearch } from '@/api/ai'
+import { Search, Clock, ArrowRight, Edit, TrendCharts, View, Star, ChatDotRound, Close, MagicStick } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -206,6 +240,14 @@ const sortMode = ref('latest')
 const hotSearchList = ref([])
 const showHotSearch = ref(false)
 const searchWrapperRef = ref(null)
+const searchMode = ref('normal')
+const aiSearchKeyword = ref('')
+const aiSearchLoading = ref(false)
+const isAiSearching = ref(false)
+const aiSearchResults = ref([])
+const lastAiQuery = ref('')
+
+const displayPosts = computed(() => isAiSearching.value ? aiSearchResults.value : posts.value)
 
 onMounted(() => {
   loadPosts()
@@ -294,8 +336,17 @@ const goToPost = (id) => {
 
 const getExcerpt = (content) => {
   if (!content) return ''
-  const plain = content.replace(/<[^>]+>/g, '').replace(/[#*`>\-\[\]()]/g, '')
+  const plain = content.replace(/<[^>]+>/g, '').replace(/[#*`>\\-\\[\\]()]/g, '')
   return plain.length > 160 ? plain.substring(0, 160) + '...' : plain
+}
+
+const getCoverImage = (content) => {
+  if (!content) return null
+  const mdMatch = content.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/)
+  if (mdMatch) return mdMatch[1]
+  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/)
+  if (htmlMatch) return htmlMatch[1]
+  return null
 }
 
 const formatTime = (time) => {
@@ -318,6 +369,30 @@ const getAvatarColor = (name) => {
 
 const goToUser = (userId) => {
   if (userId) router.push(`/user/${userId}`)
+}
+
+const handleAiSearch = async () => {
+  if (!aiSearchKeyword.value.trim()) return
+  aiSearchLoading.value = true
+  lastAiQuery.value = aiSearchKeyword.value.trim()
+  isAiSearching.value = false
+  try {
+    const res = await aiSemanticSearch(aiSearchKeyword.value.trim())
+    aiSearchResults.value = res.data || []
+    isAiSearching.value = true
+  } catch {
+    aiSearchResults.value = []
+    isAiSearching.value = true
+  } finally {
+    aiSearchLoading.value = false
+  }
+}
+
+const clearAiSearch = () => {
+  isAiSearching.value = false
+  aiSearchResults.value = []
+  aiSearchKeyword.value = ''
+  lastAiQuery.value = ''
 }
 </script>
 
@@ -760,6 +835,41 @@ const goToUser = (userId) => {
   overflow: hidden;
 }
 
+.post-card-content {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.post-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.post-cover {
+  flex-shrink: 0;
+  width: 140px;
+  height: 96px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.post-card:hover .post-cover img {
+  transform: scale(1.05);
+}
+
 .post-meta {
   display: flex;
   align-items: center;
@@ -844,4 +954,82 @@ const goToUser = (userId) => {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ===== Search Tabs ===== */
+.search-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.search-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.search-tab:hover {
+  color: rgba(255,255,255,0.9);
+}
+
+.search-tab.active {
+  background: rgba(255,255,255,0.95);
+  color: #1e293b;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.search-tab.ai-tab.active {
+  color: #6366f1;
+}
+
+.new-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: white;
+  padding: 1px 5px;
+  border-radius: 6px;
+  line-height: 14px;
+}
+
+.ai-search-append-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.ai-search-append-btn.is-loading {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  opacity: 1 !important;
+}
+
+.ai-search-append-btn.is-loading::before {
+  display: none !important;
+}
+
+.ai-search-append-btn :deep(.el-icon) {
+  margin: 0 !important;
+}
+
+.ai-search-append-btn :deep(.el-loading-mask),
+.ai-search-append-btn :deep(.el-button__loading-wrap) {
+  background: transparent !important;
+}
+
+/* ===== AI Search Dialog ===== */
 </style>

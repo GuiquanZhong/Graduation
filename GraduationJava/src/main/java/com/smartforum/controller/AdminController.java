@@ -3,7 +3,9 @@ package com.smartforum.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.smartforum.common.Result;
 import com.smartforum.entity.Post;
+import com.smartforum.entity.PostReport;
 import com.smartforum.entity.User;
+import com.smartforum.service.PostReportService;
 import com.smartforum.service.PostService;
 import com.smartforum.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +25,9 @@ public class AdminController {
     @Autowired
     private PostService postService;
 
-    /**
-     * 验证管理员权限（通用辅助方法）
-     */
+    @Autowired
+    private PostReportService postReportService;
+
     private void checkAdmin(Long userId) {
         if (!userService.isAdmin(userId)) {
             throw new RuntimeException("无管理员权限");
@@ -34,25 +36,19 @@ public class AdminController {
 
     // ============ 数据统计 ============
 
-    /**
-     * 获取后台统计数据
-     */
     @GetMapping("/stats")
     public Result<?> getStats(@RequestAttribute("userId") Long userId) {
         checkAdmin(userId);
-
         Map<String, Object> stats = new HashMap<>();
         stats.put("userCount", userService.getUserCount());
         stats.put("postCount", postService.getPostCount());
+        stats.put("pendingReportCount", postReportService.getPendingCount());
         stats.put("date", LocalDate.now().toString());
         return Result.success(stats);
     }
 
     // ============ 用户管理 ============
 
-    /**
-     * 用户列表（分页+搜索）
-     */
     @GetMapping("/users")
     public Result<?> getUserList(@RequestAttribute("userId") Long userId,
             @RequestParam(defaultValue = "1") int page,
@@ -63,9 +59,6 @@ public class AdminController {
         return Result.success(result);
     }
 
-    /**
-     * 封禁用户
-     */
     @PutMapping("/user/{targetId}/ban")
     public Result<?> banUser(@RequestAttribute("userId") Long userId,
             @PathVariable Long targetId) {
@@ -74,9 +67,6 @@ public class AdminController {
         return Result.success("封禁成功");
     }
 
-    /**
-     * 解封用户
-     */
     @PutMapping("/user/{targetId}/unban")
     public Result<?> unbanUser(@RequestAttribute("userId") Long userId,
             @PathVariable Long targetId) {
@@ -85,11 +75,20 @@ public class AdminController {
         return Result.success("解封成功");
     }
 
+    @PutMapping("/user/{targetId}/role")
+    public Result<?> updateUserRole(@RequestAttribute("userId") Long userId,
+            @PathVariable Long targetId,
+            @RequestParam String role) {
+        checkAdmin(userId);
+        if (userId.equals(targetId)) {
+            return Result.error("不能修改自己的角色");
+        }
+        userService.updateRole(targetId, role);
+        return Result.success("角色已更新");
+    }
+
     // ============ 帖子管理 ============
 
-    /**
-     * 帖子列表（分页+搜索）
-     */
     @GetMapping("/posts")
     public Result<?> getPostList(@RequestAttribute("userId") Long userId,
             @RequestParam(defaultValue = "1") int page,
@@ -100,9 +99,6 @@ public class AdminController {
         return Result.success(result);
     }
 
-    /**
-     * 管理员删除帖子
-     */
     @DeleteMapping("/post/{postId}")
     public Result<?> deletePost(@RequestAttribute("userId") Long userId,
             @PathVariable Long postId) {
@@ -111,14 +107,37 @@ public class AdminController {
         return Result.success("删除成功");
     }
 
-    /**
-     * 置顶/取消置顶帖子
-     */
     @PutMapping("/post/{postId}/top")
     public Result<?> toggleTopPost(@RequestAttribute("userId") Long userId,
             @PathVariable Long postId) {
         checkAdmin(userId);
         boolean isTop = postService.toggleTopPost(postId);
         return Result.success(isTop ? "已置顶" : "已取消置顶");
+    }
+
+    // ============ 举报管理 ============
+
+    @GetMapping("/reports")
+    public Result<?> getReportList(@RequestAttribute("userId") Long userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "all") String status) {
+        checkAdmin(userId);
+        IPage<PostReport> result = postReportService.getReportList(page, size, status);
+        return Result.success(result);
+    }
+
+    @PutMapping("/report/{reportId}/handle")
+    public Result<?> handleReport(@RequestAttribute("userId") Long userId,
+            @PathVariable Long reportId,
+            @RequestBody Map<String, String> body) {
+        checkAdmin(userId);
+        String status = body.get("status");
+        String handleNote = body.get("handleNote");
+        if (!"approved".equals(status) && !"rejected".equals(status)) {
+            return Result.error("无效的处理状态");
+        }
+        postReportService.handleReport(reportId, status, handleNote);
+        return Result.success("处理成功");
     }
 }
