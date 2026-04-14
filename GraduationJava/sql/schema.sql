@@ -4,8 +4,6 @@ COLLATE utf8mb4_unicode_ci;
 
 USE smart_forum;
 
-SET FOREIGN_KEY_CHECKS = 0;
-
 -- ================= 用户表 =================
 CREATE TABLE IF NOT EXISTS `user` (
     `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
@@ -37,11 +35,7 @@ CREATE TABLE IF NOT EXISTS `post` (
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_created_at` (`created_at`),
-    KEY `idx_is_top` (`is_top`),
-    CONSTRAINT `fk_post_user`
-        FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
+    KEY `idx_is_top` (`is_top`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章表';
 
 
@@ -54,13 +48,7 @@ CREATE TABLE IF NOT EXISTS `comment` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_post_id` (`post_id`),
-    KEY `idx_user_id` (`user_id`),
-    CONSTRAINT `fk_comment_post`
-        FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
-        ON DELETE CASCADE,
-    CONSTRAINT `fk_comment_user`
-        FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE
+    KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论表';
 
 
@@ -72,13 +60,7 @@ CREATE TABLE IF NOT EXISTS `post_like` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '点赞时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_post` (`user_id`, `post_id`),
-    KEY `idx_post_id` (`post_id`),
-    CONSTRAINT `fk_like_user`
-        FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE,
-    CONSTRAINT `fk_like_post`
-        FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
-        ON DELETE CASCADE
+    KEY `idx_post_id` (`post_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章点赞表';
 
 
@@ -90,13 +72,7 @@ CREATE TABLE IF NOT EXISTS `post_favorite` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_post` (`user_id`, `post_id`),
-    KEY `idx_post_id` (`post_id`),
-    CONSTRAINT `fk_fav_user`
-        FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE,
-    CONSTRAINT `fk_fav_post`
-        FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
-        ON DELETE CASCADE
+    KEY `idx_post_id` (`post_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章收藏表';
 
 
@@ -108,25 +84,20 @@ CREATE TABLE IF NOT EXISTS `user_follow` (
     `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '关注时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_follower_followed` (`follower_id`, `followed_id`),
-    KEY `idx_followed_id` (`followed_id`),
-    CONSTRAINT `fk_follow_follower`
-        FOREIGN KEY (`follower_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE,
-    CONSTRAINT `fk_follow_followed`
-        FOREIGN KEY (`followed_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE
+    KEY `idx_followed_id` (`followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户关注表';
 
-CREATE TABLE `ai_chat_session` (
-                                   `id`         BIGINT       NOT NULL AUTO_INCREMENT,
-                                   `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
-                                   `title`      VARCHAR(200) NOT NULL DEFAULT '新对话',
-                                   `messages`   LONGTEXT     NOT NULL,
-                                   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE
-                                               CURRENT_TIMESTAMP,
-                                   PRIMARY KEY (`id`),
-                                   KEY `idx_user_id` (`user_id`)
+
+-- ================= AI聊天会话表 =================
+CREATE TABLE IF NOT EXISTS `ai_chat_session` (
+    `id`         BIGINT       NOT NULL AUTO_INCREMENT,
+    `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+    `title`      VARCHAR(200) NOT NULL DEFAULT '新对话',
+    `messages`   LONGTEXT     NOT NULL,
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI聊天会话表';
 
 
@@ -144,14 +115,5 @@ CREATE TABLE IF NOT EXISTS `post_report` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reporter_post` (`reporter_id`, `post_id`),
     KEY `idx_post_id` (`post_id`),
-    KEY `idx_status` (`status`),
-    CONSTRAINT `fk_report_post`
-        FOREIGN KEY (`post_id`) REFERENCES `post` (`id`)
-        ON DELETE CASCADE,
-    CONSTRAINT `fk_report_reporter`
-        FOREIGN KEY (`reporter_id`) REFERENCES `user` (`id`)
-        ON DELETE CASCADE
+    KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子举报表';
-
-
-SET FOREIGN_KEY_CHECKS = 1;

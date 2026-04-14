@@ -29,6 +29,9 @@ public class PostService {
     @Autowired
     private CommentMapper commentMapper;
 
+    @Autowired
+    private PostReportMapper postReportMapper;
+
     /**
      * 发布文章
      */
@@ -203,7 +206,7 @@ public class PostService {
         if (!post.getUserId().equals(userId)) {
             throw new RuntimeException("无权限删除此文章");
         }
-        postMapper.deleteById(postId);
+        deletePostCascade(postId);
     }
 
     /**
@@ -293,6 +296,14 @@ public class PostService {
         if (post == null) {
             throw new RuntimeException("文章不存在");
         }
+        deletePostCascade(postId);
+    }
+
+    private void deletePostCascade(Long postId) {
+        commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getPostId, postId));
+        postLikeMapper.delete(new LambdaQueryWrapper<PostLike>().eq(PostLike::getPostId, postId));
+        postFavoriteMapper.delete(new LambdaQueryWrapper<PostFavorite>().eq(PostFavorite::getPostId, postId));
+        postReportMapper.delete(new LambdaQueryWrapper<PostReport>().eq(PostReport::getPostId, postId));
         postMapper.deleteById(postId);
     }
 
