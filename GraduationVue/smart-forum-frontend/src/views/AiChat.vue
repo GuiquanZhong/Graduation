@@ -118,7 +118,7 @@
           <div v-for="(msg, index) in messages" :key="index"
                :class="['message', msg.role === 'user' ? 'message-user' : 'message-ai']">
             <div class="message-avatar">
-              <el-avatar v-if="msg.role === 'user'" :size="36"
+              <el-avatar v-if="msg.role === 'user'" :size="36" :src="userStore.userInfo?.avatar"
                          :style="{ background: 'var(--gradient-primary)', fontSize: '14px', fontWeight: '700' }">
                 {{ userStore.nickname?.charAt(0) || 'U' }}
               </el-avatar>
